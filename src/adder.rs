@@ -51,24 +51,24 @@ pub trait StakeContract:
     #[payable("EGLD")]
     #[endpoint]
     fn stake(&self) {
-        let caller = self.blockchain().get_caller();
         let value = self.call_value().egld_value();
-
+        
         require!(&value > &0, "Stake value must be bigger than 0");
-
-        // mint tokens based on exchange rate
+        
+        let caller = self.blockchain().get_caller();
         let exchange_rate = self.exchange_rate().get();
+
         let st_egld_id = self.staked_egld_id().get();
         let st_egld_amount = exchange_rate * &value; 
+        
+        let current_total_supply = self.total_token_supply().get();
+        let current_delta_stake = self.delta_stake().get();
         
         self.send().esdt_local_mint(&st_egld_id, 0, &st_egld_amount);
         self.send().direct_esdt(&caller, &st_egld_id, 0, &st_egld_amount);
 
-
-        let current_total_supply = self.total_token_supply().get();
         self.total_token_supply().set(&current_total_supply + &st_egld_amount);
-
-        self.delta_stake().set(self.delta_stake().get() + &value);
+        self.delta_stake().set(&current_delta_stake + &value);
     }
 
     // Receives stEGLD
@@ -76,16 +76,17 @@ pub trait StakeContract:
     #[payable("*")]
     #[endpoint]
     fn unstake(&self) {
-        let caller = self.blockchain().get_caller();
         let (token, _, payment) = self.call_value().single_esdt().into_tuple();
         let st_egld_id = self.staked_egld_id().get();
-
         require!(&token == &st_egld_id, "Invalid token sent");
         
+        let caller = self.blockchain().get_caller();
+        let current_total_supply = self.total_token_supply().get();
+        let current_delta_stake = self.delta_stake().get();
+    
         self.send().esdt_local_burn(&st_egld_id, 0, &payment);
-
-        self.total_token_supply().set(self.total_token_supply().get() - &payment);
-        self.delta_stake().set(self.delta_stake().get() - &payment);
+        self.total_token_supply().set(&current_total_supply - &payment);
+        self.delta_stake().set(&current_delta_stake - &payment);
 
         // todo: keep track of unstaking, so user can withdraw later
     }
