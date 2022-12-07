@@ -55,6 +55,16 @@ pub trait StorageModule {
     #[storage_mapper("delta_stake")]
     fn delta_stake(&self) -> SingleValueMapper<BigInt>;
 
+    #[view(getMappingIndex)]
+    #[storage_mapper("mapping_index")]
+    fn mapping_index(&self) -> SingleValueMapper<usize>;
+
+    #[only_owner]
+    #[endpoint(setMappingIndex)]
+    fn set_mapping_index(&self, index: usize) {
+        self.mapping_index().set(index);
+    }
+
     // Token
 
     #[view(getStEgldId)]

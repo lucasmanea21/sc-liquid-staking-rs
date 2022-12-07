@@ -25,6 +25,7 @@ pub trait StakeContract:
     fn init(&self) {
         if self.delta_stake().is_empty() { self.delta_stake().set(BigInt::from(0)) };
         if self.exchange_rate().is_empty(){ self.exchange_rate().set(BigUint::from(1u64)) };
+        if self.mapping_index().is_empty(){ self.mapping_index().set(1 as usize) };
     }
 
     // #[endpoint]
@@ -99,7 +100,7 @@ pub trait StakeContract:
     
     #[only_owner]
     #[endpoint]
-    fn delegate(&self) {
+    fn delegate_test(&self) {
         // require there hasn't been a delegation this epoch
 
         let validators = self.validators();
@@ -126,6 +127,25 @@ pub trait StakeContract:
     #[endpoint]
     fn push_validators(&self, address: &ManagedAddress) {
         self.validators().push(address);
+    }
+
+    #[only_owner]
+    #[endpoint(delegateAdmin)]
+    fn delegate_admin(&self) {
+        let mapping_index = self.mapping_index().get();
+        let wanted_address = self.validators().get(mapping_index);
+
+        self.mapping_index().set(&mapping_index + 1);
+        
+        if &mapping_index >= &(self.validators().len() - 1) {
+            self.mapping_index().set(1 as usize);
+        }
+
+        self.delegate_contract(wanted_address)
+            .delegate(EgldOrEsdtTokenIdentifier::egld(), BigUint::from(1000000000000000000u64))
+            .async_call()
+            .call_and_exit();
+
     }
     
 }

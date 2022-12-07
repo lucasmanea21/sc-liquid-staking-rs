@@ -52,7 +52,7 @@ setLocalRoles() {
 
 stake() {
     erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} \
-        --gas-limit=50000000 --value=50000000000000000 --function="stake" \
+        --gas-limit=50000000 --value=1000000000000000000 --function="stake" \
         --send --proxy=${PROXY} --chain=${CHAIN_ID}
 }
 
@@ -74,8 +74,29 @@ push_validators() {
     erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="push_validators" --arguments 0x${DELEGATION_ADDRESS_HEX} --send --proxy=${PROXY} --chain=${CHAIN_ID}
 }
 
+delegateAdmin() {
+    erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="delegateAdmin" --send --proxy=${PROXY} --chain=${CHAIN_ID}
+}
+
+setMappingIndex() {
+    erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="setMappingIndex" --arguments=1 --send --proxy=${PROXY} --chain=${CHAIN_ID}
+}
+
 getValidators() {
     erdpy --verbose contract query ${ADDRESS} --function="getValidators" --proxy=${PROXY}
+}
+
+getValidatorsCount() {
+    erdpy --verbose contract query ${ADDRESS} --function="getValidatorsCount" --proxy=${PROXY}
+}
+
+getMappingIndex() {
+    erdpy --verbose contract query ${ADDRESS} --function="getMappingIndex" --proxy=${PROXY}
+}
+
+getTotalStaked() {
+    erdpy --verbose contract query ${ADDRESS} --function="getTotalStaked" --proxy=${PROXY}
+
 }
 
 getDeltaStake() {
