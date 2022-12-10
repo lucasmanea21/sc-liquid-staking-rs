@@ -1,8 +1,9 @@
 ALICE="./wallets/new-wallet.pem"
+MY_ADDRESS=erd1epacy29dkrkqaeju3k59z45rdq5c9a2dv4qs0t0992d32prx623slv5fq5
 ADDRESS=$(erdpy data load --key=address-testnet)
 ADDRESS_HEX="$(erdpy wallet bech32 --decode ${ADDRESS})"
 
-DELEGATION_ADDRESS=erd1qqqqqqqqqqqqqqqpqqqqqqqqqqqqqqqqqqqqqqqqqqqqqxhllllssz7sl7
+DELEGATION_ADDRESS=erd1qqqqqqqqqqqqqqqpqqqqqqqqqqqqqqqqqqqqqqqqqqqqqx0llllsdx93z0
 DELEGATION_ADDRESS_HEX="$(erdpy wallet bech32 --decode ${DELEGATION_ADDRESS})"
 
 DEPLOY_TRANSACTION=$(erdpy data load --key=deployTransaction-testnet)
@@ -12,9 +13,14 @@ CHAIN_ID=D
 
 NEW_TOKEN_NAME="STEGLD"
 NEW_TOKEN_NAME_HEX="$(echo -n ${NEW_TOKEN_NAME} | xxd -p -u | tr -d '\n')"
-
 TOKEN_ID="STEGLD-7294c4"
 TOKEN_ID_HEX="$(echo -n ${TOKEN_ID} | xxd -p -u | tr -d '\n')"
+
+UNDELEGATED_TOKEN_NAME="UEGLD"
+UNDELEGATED_TOKEN_NAME_HEX="$(echo -n ${UNDELEGATED_TOKEN_NAME} | xxd -p -u | tr -d '\n')"
+
+UNDELEGATED_TOKEN_ID="STEGLD-e5139f"
+UNDELEGATED_TOKEN_ID_HEX="$(echo -n ${UNDELEGATED_TOKEN_ID} | xxd -p -u | tr -d '\n')"
 
 deploy() {
     erdpy --verbose contract deploy --project=${PROJECT} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --send --outfile="deploy-testnet.interaction.json" --proxy=${PROXY} --metadata-payable --chain=${CHAIN_ID} || return
@@ -44,6 +50,15 @@ issueToken() {
         --send --proxy=${PROXY} --chain=${CHAIN_ID}
 }
 
+issueUndelegatedToken() {
+    erdpy --verbose contract call ${ADDRESS} \
+        --recall-nonce --pem=${ALICE} \
+        --gas-limit=600000000 \
+        --value=50000000000000000 \
+        --arguments 0x${UNDELEGATED_TOKEN_NAME_HEX} 0x${UNDELEGATED_TOKEN_NAME_HEX} 0x12 --function="issueUndelegatedToken" \
+        --send --proxy=${PROXY} --chain=${CHAIN_ID}
+}
+
 setLocalRoles() {
     erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} \
         --gas-limit=500000000 --function="setLocalRoles" \
@@ -60,7 +75,16 @@ unstake() {
     erdpy --verbose tx new --receiver=${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 \
         --send \
         --proxy=${PROXY} \
-        --data="ESDTTransfer@${TOKEN_ID_HEX}@075bb48691a6650ff30904000000@756e7374616b65" \
+        --data="ESDTTransfer@${TOKEN_ID_HEX}@b1a2bc2ec50000@756e7374616b65" \
+        --chain=${CHAIN_ID}
+    # --data="ESDTTransfer@${TOKEN_ID_HEX}@075bb48691a6650ff30904000000@756e7374616b65" \
+}
+
+claim() {
+    erdpy --verbose tx new --receiver=${MY_ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 \
+        --send \
+        --proxy=${PROXY} \
+        --data="ESDTNFTTransfer@${UNDELEGATED_TOKEN_ID_HEX}@01@b1a2bc2ec50000@${ADDRESS_HEX}@636c61696d" \
         --chain=${CHAIN_ID}
     # --data="ESDTTransfer@${TOKEN_ID_HEX}@b1a2bc2ec50000@756e7374616b65" \
 }
@@ -70,12 +94,21 @@ setTotalStaked() {
         --arguments=0x8ac7230489e80000 --send --proxy=${PROXY} --chain=${CHAIN_ID}
 }
 
+setDeltaStake() {
+    erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="setDeltaStake" \
+        --arguments=0x8ac7230489e80000 --send --proxy=${PROXY} --chain=${CHAIN_ID}
+}
+
 push_validators() {
     erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="push_validators" --arguments 0x${DELEGATION_ADDRESS_HEX} --send --proxy=${PROXY} --chain=${CHAIN_ID}
 }
 
-delegateAdmin() {
-    erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="delegateAdmin" --send --proxy=${PROXY} --chain=${CHAIN_ID}
+reDelegate() {
+
+    erdpy --verbose contract call ${ADDRESS} --recall-nonce \
+        --pem=${ALICE} --gas-limit=50000000 --function="reDelegate" \
+        --send --proxy=${PROXY} --chain=${CHAIN_ID} \
+        --arguments=0x${DELEGATION_ADDRESS_HEX}
 }
 
 setMappingIndex() {
@@ -107,10 +140,14 @@ getTotalTokenSupply() {
     erdpy --verbose contract query ${ADDRESS} --function="getTotalTokenSupply" --proxy=${PROXY}
 }
 
-getEpochValidators() {
-    erdpy --verbose contract query ${ADDRESS} --function="getEpochValidators" --proxy=${PROXY}
+getStEgldId() {
+    erdpy --verbose contract query ${ADDRESS} --function="getStEgldId" --proxy=${PROXY}
 }
 
 getExchangeRate() {
     erdpy --verbose contract query ${ADDRESS} --function="getExchangeRate" --proxy=${PROXY}
+}
+
+getUEgldId() {
+    erdpy --verbose contract query ${ADDRESS} --function="getUEgldId" --proxy=${PROXY}
 }

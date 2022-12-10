@@ -51,6 +51,13 @@ pub trait StorageModule {
     #[storage_mapper("exchange_rate")]
     fn exchange_rate(&self) -> SingleValueMapper<BigUint>;
 
+    #[only_owner]
+    #[endpoint(setDeltaStake)]
+    fn set_delta_stake(&self, amount: BigInt) {
+        self.delta_stake().set(&amount);
+        self.update_exchange_rate();
+    }
+
     #[view(getDeltaStake)]
     #[storage_mapper("delta_stake")]
     fn delta_stake(&self) -> SingleValueMapper<BigInt>;
@@ -65,9 +72,13 @@ pub trait StorageModule {
         self.mapping_index().set(index);
     }
 
-    // Token
+    // Tokens
 
     #[view(getStEgldId)]
     #[storage_mapper("staked_egld_id")]
     fn staked_egld_id(&self) -> SingleValueMapper<TokenIdentifier>;
+
+    #[view(getUEgldId)]
+    #[storage_mapper("undelegated_token")]
+    fn undelegated_token(&self) -> NonFungibleTokenMapper<Self::Api>;
 }
