@@ -1,22 +1,24 @@
 #![no_std]
 
 elrond_wasm::imports!();
+elrond_wasm::derive_imports!();
 
 mod delegate;
 mod storage;
 mod callbacks;
 mod events;
-mod token;
+mod tokens;
 
-/// One of the simplest smart contracts possible,
-/// it holds a single variable in storage, which anyone can increment.
+use crate::tokens::TokenAttributes;
+
 #[elrond_wasm::contract]
 pub trait StakeContract:
         elrond_wasm_modules::default_issue_callbacks::DefaultIssueCallbacksModule        
         + storage::StorageModule
         + callbacks::CallbacksModule
         + events::EventsModule
-        + token::TokenModule {
+        + tokens::TokenModule {
+
 
     #[proxy]
     fn delegate_contract(&self, sc_address: ManagedAddress) -> delegate::Proxy<Self::Api>;
@@ -25,6 +27,7 @@ pub trait StakeContract:
     fn init(&self) {
         if self.delta_stake().is_empty() { self.delta_stake().set(BigInt::from(0)) };
         if self.exchange_rate().is_empty(){ self.exchange_rate().set(BigUint::from(1u64)) };
+        if self.mapping_index().is_empty(){ self.mapping_index().set(1 as usize) };
     }
 
     // #[endpoint]
@@ -89,7 +92,53 @@ pub trait StakeContract:
         self.delta_stake().set(&current_delta_stake - &payment);
 
         // todo: keep track of unstaking, so user can withdraw later
+        
+        /*
+            mint uEGLD based on exchange rate (mint the EGLD equivalent)
+        */  
+        let exchange_rate = self.exchange_rate().get();
+
+        let attr = &TokenAttributes {
+            epoch: self.blockchain().get_block_epoch()
+        };
+
+
+        self.create_and_send_locked_assets(
+            &payment / &exchange_rate,
+            &caller,
+            &attr,
+        );
     }
+
+    #[payable("*")]
+    #[endpoint]
+    fn claim(&self) {
+        let (token, nonce, payment) = self.call_value().single_esdt().into_tuple();
+        let caller = self.blockchain().get_caller();
+        let sc_address = &self.blockchain().get_sc_address();
+        let current_epoch = self.blockchain().get_block_epoch();
+        let undelegated_token = self.undelegated_token().get_token_id();
+
+        require!(&token == &undelegated_token, "Invalid token sent");
+
+        let token_info = self.blockchain().get_esdt_token_data(
+            &sc_address,
+            &token,
+            nonce,
+        );
+
+        let attr = self.serializer()
+            .top_decode_from_managed_buffer::<TokenAttributes>(
+                &token_info.attributes,
+            );
+
+        if (&attr.epoch - current_epoch) >= 1 {
+            self.send().direct_egld(&caller, &payment)
+        }
+    }
+
+    // Admin operations
+    // todo: move all to admin.rs file
 
     /* 
         Endpoint for delegating EGLD to validators, claiming rewards and other maintenance actions.
@@ -99,7 +148,7 @@ pub trait StakeContract:
     
     #[only_owner]
     #[endpoint]
-    fn delegate(&self) {
+    fn delegate_test(&self) {
         // require there hasn't been a delegation this epoch
 
         let validators = self.validators();
@@ -126,6 +175,43 @@ pub trait StakeContract:
     #[endpoint]
     fn push_validators(&self, address: &ManagedAddress) {
         self.validators().push(address);
+    }
+
+    #[only_owner]
+    #[endpoint(delegateAdmin)]
+    fn delegate_admin(&self) {
+        let mapping_index = self.mapping_index().get();
+        let wanted_address = self.validators().get(mapping_index);
+
+        self.mapping_index().set(&mapping_index + 1);
+        
+        if &mapping_index >= &(self.validators().len() - 1) {
+            self.mapping_index().set(1 as usize);
+        }
+
+        self.delegate_contract(wanted_address)
+            .delegate(EgldOrEsdtTokenIdentifier::egld(), BigUint::from(1000000000000000000u64))
+            .async_call()
+            .call_and_exit();
+
+    }
+
+    #[only_owner]
+    #[endpoint]
+    fn reDelegate(&self, address: ManagedAddress) {
+        self.delegate_contract(address)
+        .reDelegateRewards()
+        .async_call()
+        .call_and_exit();
+    }
+
+    #[only_owner]
+    #[endpoint]
+    fn undelegateAdmin(&self, address: ManagedAddress, amount: &BigUint) {
+        self.delegate_contract(address)
+        .unDelegate(amount)
+        .async_call()
+        .call_and_exit();
     }
     
 }

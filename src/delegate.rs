@@ -16,5 +16,10 @@ pub trait Delegate {
         &self,
         amount: BigUint
     );
+
+    #[endpoint(reDelegateRewards)]
+    fn reDelegateRewards(
+        &self,
+    );
     
 }
