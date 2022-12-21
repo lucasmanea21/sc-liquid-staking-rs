@@ -10,6 +10,8 @@ mod events;
 mod tokens;
 
 use crate::tokens::TokenAttributes;
+use crate::heap::Vec;
+use crate::storage::StakeAmount;
 
 #[elrond_wasm::contract]
 pub trait StakeContract:
@@ -81,7 +83,9 @@ pub trait StakeContract:
     fn unstake(&self) {
         let (token, _, payment) = self.call_value().single_esdt().into_tuple();
         let st_egld_id = self.staked_egld_id().get();
+
         require!(&token == &st_egld_id, "Invalid token sent");
+        require!(&payment > &0, "Cannot receive 0 amount");
         
         let caller = self.blockchain().get_caller();
         let current_total_supply = self.total_token_supply().get();
@@ -103,7 +107,7 @@ pub trait StakeContract:
         };
 
 
-        self.create_and_send_locked_assets(
+        self.create_and_send_assets(
             &payment / &exchange_rate,
             &caller,
             &attr,
@@ -118,19 +122,24 @@ pub trait StakeContract:
         let sc_address = &self.blockchain().get_sc_address();
         let current_epoch = self.blockchain().get_block_epoch();
         let undelegated_token = self.undelegated_token().get_token_id();
-
+        
         require!(&token == &undelegated_token, "Invalid token sent");
-
+        require!(&payment > &0, "Cannot receive 0 amount");
+        
         let token_info = self.blockchain().get_esdt_token_data(
             &sc_address,
             &token,
             nonce,
         );
-
+        
         let attr = self.serializer()
-            .top_decode_from_managed_buffer::<TokenAttributes>(
+        .top_decode_from_managed_buffer::<TokenAttributes>(
                 &token_info.attributes,
             );
+            
+        let service_fee = self.service_fee().get();
+
+        // check if the epochs required to claim passed
 
         if (&attr.epoch - current_epoch) >= 1 {
             self.send().direct_egld(&caller, &payment)
@@ -149,7 +158,9 @@ pub trait StakeContract:
     #[only_owner]
     #[endpoint]
     fn delegate_test(&self) {
-        // require there hasn't been a delegation this epoch
+        // solution for delegating inside SC
+        // todo: make this work
+        // requires there hasn't been a delegation this epoch
 
         let validators = self.validators();
         let mut epoch_validators = self.epoch_validators();
@@ -172,6 +183,39 @@ pub trait StakeContract:
     }
 
     #[only_owner]
+    #[endpoint(getStakeAdmin)]
+    fn get_stake_admin(&self) {
+        // solution for getting how much the SC has staked to validators inside the SC
+        // could be replaced with off-chain daemon
+
+        let current_epoch = self.blockchain().get_block_epoch();
+        let mapping_index = self.mapping_index().get();
+        let sc_address = self.blockchain().get_sc_address();
+
+        let current_epoch_amounts: _= self.stake_amounts().iter().filter(|amount| amount.epoch == current_epoch).collect::<ManagedVec<StakeAmount<Self::Api>>>();
+
+        self.filtered_stake_amounts_length().set(&current_epoch_amounts.len());
+        self.filtered_stake_amounts().set(&current_epoch_amounts);
+
+        if current_epoch_amounts.len() == 0 {
+            self.mapping_index().set(1 as usize)
+        };
+        
+        require!(current_epoch_amounts.len() == 0 && mapping_index != 1, "already got stake amount this epoch");
+        
+
+        let wanted_address = self.validators().get(mapping_index);
+
+        // adder::delegate_contract(self,wanted_address)
+        //     .getUserActiveStake(sc_address)
+        //     .async_call()
+        //     .with_callback(self.callbacks(self).get_stake_callback(current_epoch ))
+        //     .call_and_exit();
+
+    }
+
+
+    #[only_owner]
     #[endpoint]
     fn push_validators(&self, address: &ManagedAddress) {
         self.validators().push(address);
@@ -179,7 +223,9 @@ pub trait StakeContract:
 
     #[only_owner]
     #[endpoint(delegateAdmin)]
-    fn delegate_admin(&self) {
+    fn delegate_admin(&self, amount: BigUint) {
+        // solution for on-chain delegation
+
         let mapping_index = self.mapping_index().get();
         let wanted_address = self.validators().get(mapping_index);
 
@@ -190,28 +236,68 @@ pub trait StakeContract:
         }
 
         self.delegate_contract(wanted_address)
-            .delegate(EgldOrEsdtTokenIdentifier::egld(), BigUint::from(1000000000000000000u64))
+            .delegate(EgldOrEsdtTokenIdentifier::egld(), amount)
             .async_call()
             .call_and_exit();
 
     }
 
     #[only_owner]
-    #[endpoint]
-    fn reDelegate(&self, address: ManagedAddress) {
+    #[endpoint(delegate_direct)]
+    fn delegate_direct(&self, address: ManagedAddress, amount: BigUint) {
+        // directly delegates to the contract specified. 
+
         self.delegate_contract(address)
-        .reDelegateRewards()
+        .delegate(EgldOrEsdtTokenIdentifier::egld(), amount)
         .async_call()
         .call_and_exit();
     }
 
     #[only_owner]
     #[endpoint]
-    fn undelegateAdmin(&self, address: ManagedAddress, amount: &BigUint) {
+    fn undelegate_direct(&self, address: ManagedAddress, amount: &BigUint) {
+        // directly undelegates from the contract specified. 
+
         self.delegate_contract(address)
         .unDelegate(amount)
         .async_call()
         .call_and_exit();
     }
-    
+
+    #[only_owner]
+    #[endpoint(redelegate)]
+    fn redelegate(&self) {
+        // redelegates rewards at each validator.
+        // should be done after computing rewards 
+
+        let validators = self.validators();
+
+        for address in validators.iter() {
+
+            self.delegate_contract(address)
+            .reDelegateRewards()
+            .with_gas_limit(7000000)
+            .transfer_execute();
+        }
+    }
+
+  
+
+    // #[only_owner]
+    // #[endpoint(claimProtocolRewards)]
+    // fn claim_protocol_rewards(&self) {
+    //     // based on the rewards amount of the epoch, mint 7.5% of it of stEGLD 
+
+    //     let rewards = self.rewards_amount().get();
+    //     let protocol_fee = self.service_fee().get();
+    //     let protocol_rewards = (protocol_fee / 1000)* rewards;
+    //     let owner = self.blockchain().get_owner_address();
+
+    //     let st_egld_id = self.staked_egld_id().get();
+        
+    //     self.send().esdt_local_mint(&st_egld_id, 0, &protocol_rewards);
+    //     self.send().direct_esdt(&owner, &st_egld_id, 0, &protocol_rewards);
+
+    // }
+   
 }

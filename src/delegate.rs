@@ -21,5 +21,11 @@ pub trait Delegate {
     fn reDelegateRewards(
         &self,
     );
+
+    #[endpoint(getUserActiveStake)]
+    fn getUserActiveStake(
+        &self,
+        address: &ManagedAddress
+    );
     
 }

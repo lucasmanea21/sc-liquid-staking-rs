@@ -110,7 +110,7 @@ pub trait TokenModule:
 
     // Management
     #[inline]
-    fn create_and_send_locked_assets(
+    fn create_and_send_assets(
         &self,
         amount: BigUint,
         address: &ManagedAddress,
