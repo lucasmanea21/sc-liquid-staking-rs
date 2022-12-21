@@ -3,7 +3,7 @@ MY_ADDRESS=erd1epacy29dkrkqaeju3k59z45rdq5c9a2dv4qs0t0992d32prx623slv5fq5
 ADDRESS=$(erdpy data load --key=address-testnet)
 ADDRESS_HEX="$(erdpy wallet bech32 --decode ${ADDRESS})"
 
-DELEGATION_ADDRESS=erd1qqqqqqqqqqqqqqqpqqqqqqqqqqqqqqqqqqqqqqqqqqqqqx0llllsdx93z0
+DELEGATION_ADDRESS=erd1qqqqqqqqqqqqqqqpqqqqqqqqqqqqqqqqqqqqqqqqqqqqqr8llllse9cj2t
 DELEGATION_ADDRESS_HEX="$(erdpy wallet bech32 --decode ${DELEGATION_ADDRESS})"
 
 DEPLOY_TRANSACTION=$(erdpy data load --key=deployTransaction-testnet)
@@ -94,25 +94,37 @@ setTotalStaked() {
         --arguments=0x8ac7230489e80000 --send --proxy=${PROXY} --chain=${CHAIN_ID}
 }
 
+redelegate() {
+    erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=600000000 --function="redelegate" \
+        --send --proxy=${PROXY} --chain=${CHAIN_ID}
+}
+
 setDeltaStake() {
     erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="setDeltaStake" \
         --arguments=0x8ac7230489e80000 --send --proxy=${PROXY} --chain=${CHAIN_ID}
+}
+
+getStakeAdmin() {
+    erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="getStakeAdmin" \
+        --send --proxy=${PROXY} --chain=${CHAIN_ID}
+}
+
+clearValidators() {
+    erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="clearValidators" \
+        --send --proxy=${PROXY} --chain=${CHAIN_ID}
 }
 
 push_validators() {
     erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="push_validators" --arguments 0x${DELEGATION_ADDRESS_HEX} --send --proxy=${PROXY} --chain=${CHAIN_ID}
 }
 
-reDelegate() {
-
-    erdpy --verbose contract call ${ADDRESS} --recall-nonce \
-        --pem=${ALICE} --gas-limit=50000000 --function="reDelegate" \
-        --send --proxy=${PROXY} --chain=${CHAIN_ID} \
-        --arguments=0x${DELEGATION_ADDRESS_HEX}
-}
-
 setMappingIndex() {
     erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="setMappingIndex" --arguments=1 --send --proxy=${PROXY} --chain=${CHAIN_ID}
+}
+
+setServiceFee() {
+    erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="setServiceFee" \
+        --arguments=0x4b --send --proxy=${PROXY} --chain=${CHAIN_ID}
 }
 
 getValidators() {
@@ -121,6 +133,26 @@ getValidators() {
 
 getValidatorsCount() {
     erdpy --verbose contract query ${ADDRESS} --function="getValidatorsCount" --proxy=${PROXY}
+}
+
+getFilteredStakeAmountsLength() {
+    erdpy --verbose contract query ${ADDRESS} --function="getFilteredStakeAmountsLength" --proxy=${PROXY}
+}
+
+getFilteredStakeAmounts() {
+    erdpy --verbose contract query ${ADDRESS} --function="getFilteredStakeAmounts" --proxy=${PROXY}
+}
+
+getStakeAmounts() {
+    erdpy --verbose contract query ${ADDRESS} --function="getStakeAmounts" --proxy=${PROXY}
+}
+
+getServiceFee() {
+    erdpy --verbose contract query ${ADDRESS} --function="getServiceFee" --proxy=${PROXY}
+}
+
+getCallbackResult() {
+    erdpy --verbose contract query ${ADDRESS} --function="getCallbackResult" --proxy=${PROXY}
 }
 
 getMappingIndex() {
