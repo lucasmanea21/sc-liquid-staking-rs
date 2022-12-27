@@ -8,10 +8,13 @@ mod storage;
 mod callbacks;
 mod events;
 mod tokens;
+mod helpers;
+mod maintenance;
 
 use crate::tokens::TokenAttributes;
 use crate::heap::Vec;
 use crate::storage::StakeAmount;
+use crate::callbacks::CallbacksModule;
 
 #[elrond_wasm::contract]
 pub trait StakeContract:
@@ -19,7 +22,9 @@ pub trait StakeContract:
         + storage::StorageModule
         + callbacks::CallbacksModule
         + events::EventsModule
-        + tokens::TokenModule {
+        + tokens::TokenModule
+        + helpers::HelpersModule
+        + maintenance::MaintenanceModule {
 
 
     #[proxy]
@@ -192,28 +197,113 @@ pub trait StakeContract:
         let mapping_index = self.mapping_index().get();
         let sc_address = self.blockchain().get_sc_address();
 
-        let current_epoch_amounts: _= self.stake_amounts().iter().filter(|amount| amount.epoch == current_epoch).collect::<ManagedVec<StakeAmount<Self::Api>>>();
+        // let current_epoch_amounts: _= self.stake_amounts().iter().filter(|amount| amount.epoch == current_epoch).collect::<ManagedVec<StakeAmount<Self::Api>>>();
+        let epoch_exists = self.stake_amounts().contains_key(&current_epoch);
 
-        self.filtered_stake_amounts_length().set(&current_epoch_amounts.len());
-        self.filtered_stake_amounts().set(&current_epoch_amounts);
+        // self.filtered_stake_amounts_length().set(&current_epoch_amounts.len());
+        // self.filtered_stake_amounts().set(&current_epoch_amounts);
 
-        if current_epoch_amounts.len() == 0 {
-            self.mapping_index().set(1 as usize)
+        require!(!(epoch_exists && mapping_index == 1), "already got stake amount this epoch");
+        
+        if !epoch_exists {
+            self.mapping_index().set(1 as usize);
+            self.stake_info_finished().set(false);
         };
-        
-        require!(current_epoch_amounts.len() == 0 && mapping_index != 1, "already got stake amount this epoch");
-        
 
         let wanted_address = self.validators().get(mapping_index);
 
-        // adder::delegate_contract(self,wanted_address)
-        //     .getUserActiveStake(sc_address)
-        //     .async_call()
-        //     .with_callback(self.callbacks(self).get_stake_callback(current_epoch ))
-        //     .call_and_exit();
+        self.increment_index();
+
+        self.delegate_contract(wanted_address)
+            .getUserActiveStake(sc_address)
+            .async_call()
+            .with_callback(StakeContract::callbacks(self).get_stake_callback(current_epoch))
+            .call_and_exit();
 
     }
 
+    // todo: move this to callbacks.rs
+    #[callback]
+    fn get_stake_callback(
+        &self,
+        current_epoch: u64,
+        #[call_result] result: ManagedAsyncCallResult<BigUint>
+    ) {
+        match result {
+            ManagedAsyncCallResult::Ok(value) => {
+                let old_value = self.stake_amounts().get(&current_epoch);
+
+                self.stake_amounts().insert(current_epoch, match old_value {
+                    Some(n) => n,
+                    None => BigUint::from(0u64)
+                } + value.clone());
+
+                self.callback_result().set(&value);
+            },
+            ManagedAsyncCallResult::Err(err) => {
+            },
+        }
+    }
+
+    #[only_owner]
+    #[endpoint(getRewardsAdmin)]
+    fn get_rewards_admin(&self) {
+        // solution for getting how much the SC has staked to validators inside the SC
+        // could be replaced with off-chain daemon
+
+        let current_epoch = self.blockchain().get_block_epoch();
+        let mapping_index = self.rewards_mapping_index().get();
+        let sc_address = self.blockchain().get_sc_address();
+
+        // let current_epoch_amounts: _= self.stake_amounts().iter().filter(|amount| amount.epoch == current_epoch).collect::<ManagedVec<StakeAmount<Self::Api>>>();
+        let epoch_exists = self.rewards_amounts().contains_key(&current_epoch);
+
+        // self.filtered_stake_amounts_length().set(&current_epoch_amounts.len());
+        // self.filtered_stake_amounts().set(&current_epoch_amounts);
+
+        require!(!(epoch_exists && mapping_index == 1), "already got rewards amount this epoch");
+        
+        if !epoch_exists {
+            self.rewards_mapping_index().set(1 as usize);
+            self.stake_info_finished().set(false);
+        };
+
+        let wanted_address = self.validators().get(mapping_index);
+
+        self.increment_index_rewards();
+
+        self.delegate_contract(wanted_address)
+            .getClaimableRewards(sc_address)
+            .async_call()
+            .with_callback(StakeContract::callbacks(self).get_rewards_callback(current_epoch))
+            .call_and_exit();
+
+    }
+
+    #[callback]
+    fn get_rewards_callback(
+        &self,
+        current_epoch: u64,
+        #[call_result] result: ManagedAsyncCallResult<BigUint>
+    ) {
+        match result {
+            ManagedAsyncCallResult::Ok(value) => {
+                let old_value = self.rewards_amounts().get(&current_epoch);
+                let mapping_index = self.mapping_index().get();
+
+                self.rewards_amounts().insert(current_epoch, match old_value {
+                    Some(n) => n,
+                    None => BigUint::from(0u64)
+                } + value.clone());
+
+                self.update_protocol_revenue(&current_epoch);
+
+                self.callback_result().set(&value);
+            },
+            ManagedAsyncCallResult::Err(err) => {
+            },
+        }
+    }
 
     #[only_owner]
     #[endpoint]
@@ -270,10 +360,16 @@ pub trait StakeContract:
         // redelegates rewards at each validator.
         // should be done after computing rewards 
 
+        let current_epoch = self.blockchain().get_block_epoch();
+        let epoch_exists = self.rewards_amounts().contains_key(&current_epoch);
+        let is_rewards_info_finished = self.rewards_info_finished().get();
         let validators = self.validators();
 
-        for address in validators.iter() {
+        // todo: stop it from running twice in an epoch
 
+        require!(epoch_exists && is_rewards_info_finished, "must get rewards first");
+
+        for address in validators.iter() {
             self.delegate_contract(address)
             .reDelegateRewards()
             .with_gas_limit(7000000)

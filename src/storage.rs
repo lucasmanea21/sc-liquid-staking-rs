@@ -55,13 +55,6 @@ pub trait StorageModule {
     #[storage_mapper("delta_stake")]
     fn delta_stake(&self) -> SingleValueMapper<BigInt>;
 
-    #[view(getMappingIndex)]
-    #[storage_mapper("mapping_index")]
-    fn mapping_index(&self) -> SingleValueMapper<usize>;
-
-    #[view(getStakeAmounts)]
-    #[storage_mapper("stake_amounts")]
-    fn stake_amounts(&self) -> VecMapper<StakeAmount<Self::Api>>;
 
     #[view(getFilteredStakeAmountsLength)]
     #[storage_mapper("filtered_stake_amounts_length")]
@@ -81,9 +74,46 @@ pub trait StorageModule {
     #[storage_mapper("callback_result")]
     fn callback_result(&self) -> SingleValueMapper<BigUint>;
 
+    #[view(getProtocolRevenue)]
+    #[storage_mapper("protocol_revenue")]
+    fn protocol_revenue(&self) -> SingleValueMapper<BigUint>;
+
     #[view(getServiceFee)]
     #[storage_mapper("service_fee")]
     fn service_fee(&self) -> SingleValueMapper<BigUint>;
+
+    // Mappers
+    // - used for the maintenance tasks
+
+
+    #[view(getMappingIndex)]
+    #[storage_mapper("mapping_index")]
+    fn mapping_index(&self) -> SingleValueMapper<usize>;
+
+    #[view(getRewardsMappingIndex)]
+    #[storage_mapper("rewards_mapping_index")]
+    fn rewards_mapping_index(&self) -> SingleValueMapper<usize>;
+
+    // Maintenance info
+
+    #[view(getStakeAmounts)]
+    #[storage_mapper("stake_amounts")]
+    fn stake_amounts(&self) -> MapMapper<u64,BigUint>;
+
+    #[view(getRewardsAmounts)]
+    #[storage_mapper("rewards_amounts")]
+    fn rewards_amounts(&self) -> MapMapper<u64,BigUint>;
+
+
+    #[view(getStakeInfoFinished)]
+    #[storage_mapper("stake_info_finished")]
+    fn stake_info_finished(&self) -> SingleValueMapper<bool>;
+
+
+    #[view(getRewardsInfoFinished)]
+    #[storage_mapper("rewards_info_finished")]
+    fn rewards_info_finished(&self) -> SingleValueMapper<bool>;
+    
 
     // Tokens
 
@@ -112,17 +142,27 @@ pub trait StorageModule {
     }
 
     #[only_owner]
+    #[endpoint(setRewardsMappingIndex)]
+    fn set_rewards_mapping_index(&self, index: usize) {
+        self.rewards_mapping_index().set(index);
+    }
+
+    #[only_owner]
     #[endpoint(setDeltaStake)]
     fn set_delta_stake(&self, amount: BigInt) {
         self.delta_stake().set(&amount);
-        self.update_exchange_rate();
     }
 
     #[only_owner]
     #[endpoint(setTotalStaked)]
     fn set_total_staked(&self, amount: BigUint) {
         self.total_staked().set(amount);
-        self.update_exchange_rate();
+    }
+
+    #[only_owner]
+    #[endpoint(clearRewardsAmounts)]
+    fn clear_rewards_amounts(&self) {
+        self.rewards_amounts().clear();
     }
 
     #[only_owner]
@@ -131,11 +171,4 @@ pub trait StorageModule {
         self.validators().clear();
     }
 
-    #[inline]
-    fn update_exchange_rate(&self) {
-        let total_staked = self.total_staked().get();
-        let total_token_supply = self.total_token_supply().get();
-
-        self.exchange_rate().set(total_token_supply / total_staked);
-    }
 }
