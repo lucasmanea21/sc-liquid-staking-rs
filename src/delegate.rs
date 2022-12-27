@@ -28,4 +28,9 @@ pub trait Delegate {
         address: &ManagedAddress
     );
     
+    #[endpoint(getClaimableRewards)]
+    fn getClaimableRewards(
+        &self,
+        address: &ManagedAddress
+    );
 }

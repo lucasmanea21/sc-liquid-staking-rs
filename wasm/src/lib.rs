@@ -8,21 +8,50 @@ elrond_wasm_node::wasm_endpoints! {
     sc_liquid_staking_mock
     (
         callBack
-        delegate
+        claim
+        clearRewardsAmounts
+        clearValidators
+        delegateAdmin
+        delegate_direct
+        delegate_test
+        distributeProtocolRevenue
+        getCallbackResult
         getDeltaStake
         getEpochValidators
         getExchangeRate
+        getFilteredStakeAmounts
+        getFilteredStakeAmountsLength
+        getMappingIndex
+        getProtocolRevenue
+        getRewardsAdmin
+        getRewardsAmount
+        getRewardsAmounts
+        getRewardsInfoFinished
+        getRewardsMappingIndex
+        getServiceFee
         getStEgldId
+        getStakeAdmin
+        getStakeAmounts
+        getStakeInfoFinished
         getTotalStaked
         getTotalTokenSupply
+        getUEgldId
         getUsedValidators
         getValidators
         getValidatorsCount
         issueToken
+        issueUndelegatedToken
         push_validators
+        redelegate
+        setDeltaStake
         setLocalRoles
-        set_total_staked
+        setMappingIndex
+        setRewardsMappingIndex
+        setServiceFee
+        setTotalStaked
         stake
+        undelegate_direct
         unstake
+        updateExchangeRate
     )
 }

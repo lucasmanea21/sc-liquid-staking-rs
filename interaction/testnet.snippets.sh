@@ -109,8 +109,18 @@ getStakeAdmin() {
         --send --proxy=${PROXY} --chain=${CHAIN_ID}
 }
 
+getRewardsAdmin() {
+    erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="getRewardsAdmin" \
+        --send --proxy=${PROXY} --chain=${CHAIN_ID}
+}
+
 clearValidators() {
     erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="clearValidators" \
+        --send --proxy=${PROXY} --chain=${CHAIN_ID}
+}
+
+updateExchangeRate() {
+    erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="updateExchangeRate" \
         --send --proxy=${PROXY} --chain=${CHAIN_ID}
 }
 
@@ -122,13 +132,38 @@ setMappingIndex() {
     erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="setMappingIndex" --arguments=1 --send --proxy=${PROXY} --chain=${CHAIN_ID}
 }
 
+setRewardsMappingIndex() {
+    erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="setRewardsMappingIndex" --arguments=2 --send --proxy=${PROXY} --chain=${CHAIN_ID}
+}
+
+clearRewardsAmounts() {
+    erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="clearRewardsAmounts" --send --proxy=${PROXY} --chain=${CHAIN_ID}
+}
+
 setServiceFee() {
     erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="setServiceFee" \
         --arguments=0x4b --send --proxy=${PROXY} --chain=${CHAIN_ID}
 }
 
+distributeProtocolRevenue() {
+    erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="distributeProtocolRevenue" \
+        --send --proxy=${PROXY} --chain=${CHAIN_ID}
+}
+
 getValidators() {
     erdpy --verbose contract query ${ADDRESS} --function="getValidators" --proxy=${PROXY}
+}
+
+getProtocolRevenue() {
+    erdpy --verbose contract query ${ADDRESS} --function="getProtocolRevenue" --proxy=${PROXY}
+}
+
+getRewardsInfoFinished() {
+    erdpy --verbose contract query ${ADDRESS} --function="getRewardsInfoFinished" --proxy=${PROXY}
+}
+
+getStakeInfoFinished() {
+    erdpy --verbose contract query ${ADDRESS} --function="getStakeInfoFinished" --proxy=${PROXY}
 }
 
 getValidatorsCount() {
@@ -157,6 +192,10 @@ getCallbackResult() {
 
 getMappingIndex() {
     erdpy --verbose contract query ${ADDRESS} --function="getMappingIndex" --proxy=${PROXY}
+}
+
+getRewardsMappingIndex() {
+    erdpy --verbose contract query ${ADDRESS} --function="getRewardsMappingIndex" --proxy=${PROXY}
 }
 
 getTotalStaked() {

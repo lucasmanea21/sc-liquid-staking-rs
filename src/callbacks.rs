@@ -33,41 +33,6 @@ pub trait CallbacksModule: crate::storage::StorageModule + crate::events::Events
         }
     }    
 
-    #[callback]
-    fn get_stake_callback(
-        &self,
-        current_epoch: u64,
-        #[call_result] result: ManagedAsyncCallResult<BigUint>
-    ) {
-        match result {
-            ManagedAsyncCallResult::Ok(value) => {
-                let mapping_index = self.mapping_index().get();
-
-                self.mapping_index().set(&mapping_index + &1);
-                
-                if &mapping_index >= &(self.validators().len()) {
-                    self.mapping_index().set(1 as usize);
-                }
-
-                let stake_amount = StakeAmount {
-                    epoch: current_epoch,
-                    amount: value.clone()
-                };
-
-                self.stake_amounts().push(&stake_amount);
-
-                self.callback_result().set(&value);
-            },
-            ManagedAsyncCallResult::Err(err) => {
-                let mapping_index = self.mapping_index().get();
-
-                self.mapping_index().set(&mapping_index + &1);
-                
-                if &mapping_index >= &(self.validators().len()) {
-                    self.mapping_index().set(1 as usize);
-                }
-            },
-        }
-    }
+   
    
 }
