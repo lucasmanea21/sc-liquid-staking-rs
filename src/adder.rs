@@ -66,7 +66,7 @@ pub trait StakeContract:
         let mut delta = self.delta_stake().get();
         let validators = self.validators();
         let validators_len = self.validators().len();
-        while delta > 0 {
+        while delta > 0 && delta != 1 {
             let MAX: u32 = <u32>::max_value();
             let mut smallest_count = 0;
             let mut smallest = BigUint::from(MAX as u32);
