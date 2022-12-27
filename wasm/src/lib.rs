@@ -11,6 +11,7 @@ elrond_wasm_node::wasm_endpoints! {
         claim
         clearRewardsAmounts
         clearValidators
+        daily_delegation
         delegateAdmin
         delegate_direct
         delegate_test
@@ -37,6 +38,7 @@ elrond_wasm_node::wasm_endpoints! {
         getTotalTokenSupply
         getUEgldId
         getUsedValidators
+        getValidatorStakeAmount
         getValidators
         getValidatorsCount
         issueToken

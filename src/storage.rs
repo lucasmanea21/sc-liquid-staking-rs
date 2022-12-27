@@ -34,6 +34,10 @@ pub trait StorageModule {
     #[view(getValidators)]
     #[storage_mapper("validators")]
     fn validators(&self) -> VecMapper<ManagedAddress>;
+
+    #[view(getValidatorStakeAmount)]
+    #[storage_mapper("validator_stake_amount")]
+    fn validator_stake_amount(&self, address: &ManagedAddress) -> SingleValueMapper<BigUint>;
     
 
     // Stake
