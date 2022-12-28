@@ -60,7 +60,7 @@ pub trait StakeContract:
     // }
 
     // Receives EGLD, mints and sends stEGLD
-    
+
     #[only_owner]
     #[endpoint]
     fn daily_delegation(&self) {
@@ -113,13 +113,13 @@ pub trait StakeContract:
                         self.validator_stake_amount(&validator).set(&new_value);
 
                         let value_validator=new_value-&amount;
-                        self.delegate_direct(validator, amount);
+                        self.delegate_direct(validator, value_validator);
                     } else {
                         let amount = self.validator_stake_amount(&validator).get();
                         let new_value = &amount * &difference;
                         self.validator_stake_amount(&validator).set(&new_value);
                         let value_validator=new_value-&amount;
-                        self.delegate_direct(validator, amount);
+                        self.delegate_direct(validator, value_validator);
                     }
                 }
             }
