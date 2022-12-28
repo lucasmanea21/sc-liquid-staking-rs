@@ -60,12 +60,14 @@ pub trait StakeContract:
     // }
 
     // Receives EGLD, mints and sends stEGLD
-
+    
+    #[only_owner]
     #[endpoint]
     fn daily_delegation(&self) {
         let mut delta = self.delta_stake().get();
         let validators = self.validators();
         let validators_len = self.validators().len();
+
         while delta > 0 && delta != 1 {
             let MAX: u32 = <u32>::max_value();
             let mut smallest_count = 0;
@@ -107,12 +109,17 @@ pub trait StakeContract:
                 if self.validator_stake_amount(&validator).get() == smallest {
                     if difference_bigint > max_per_validator {
                         let amount = self.validator_stake_amount(&validator).get();
-                        let new_value = amount * &max_per_validator.magnitude();
-                        self.validator_stake_amount(&validator).set(new_value);
+                        let new_value = &amount * &max_per_validator.magnitude();
+                        self.validator_stake_amount(&validator).set(&new_value);
+
+                        let value_validator=new_value-&amount;
+                        self.delegate_direct(validator, amount);
                     } else {
                         let amount = self.validator_stake_amount(&validator).get();
-                        let new_value = amount * &difference;
-                        self.validator_stake_amount(&validator).set(new_value);
+                        let new_value = &amount * &difference;
+                        self.validator_stake_amount(&validator).set(&new_value);
+                        let value_validator=new_value-&amount;
+                        self.delegate_direct(validator, amount);
                     }
                 }
             }
