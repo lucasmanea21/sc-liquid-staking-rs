@@ -134,6 +134,12 @@ pub trait StorageModule {
     */
 
     #[only_owner]
+    #[endpoint(setValidatorStakeAmount)]
+    fn set_validator_stake_amount(&self, validator: &ManagedAddress, amount: &BigUint) {
+        self.validator_stake_amount(&validator).set(amount);
+    }
+
+    #[only_owner]
     #[endpoint(setServiceFee)]
     fn set_service_fee(&self, amount: BigUint) {
         self.service_fee().set(amount);

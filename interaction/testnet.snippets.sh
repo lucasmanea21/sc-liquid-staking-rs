@@ -124,6 +124,11 @@ updateExchangeRate() {
         --send --proxy=${PROXY} --chain=${CHAIN_ID}
 }
 
+dailyDelegation() {
+    erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="dailyDelegation" \
+        --send --proxy=${PROXY} --chain=${CHAIN_ID}
+}
+
 push_validators() {
     erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="push_validators" --arguments 0x${DELEGATION_ADDRESS_HEX} --send --proxy=${PROXY} --chain=${CHAIN_ID}
 }
@@ -145,6 +150,11 @@ setServiceFee() {
         --arguments=0x4b --send --proxy=${PROXY} --chain=${CHAIN_ID}
 }
 
+setValidatorStakeAmount() {
+    erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="setValidatorStakeAmount" \
+        --arguments 0x${DELEGATION_ADDRESS_HEX} 0x8ac7230489e80000 --send --proxy=${PROXY} --chain=${CHAIN_ID}
+}
+
 distributeProtocolRevenue() {
     erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="distributeProtocolRevenue" \
         --send --proxy=${PROXY} --chain=${CHAIN_ID}
@@ -156,6 +166,10 @@ getValidators() {
 
 getProtocolRevenue() {
     erdpy --verbose contract query ${ADDRESS} --function="getProtocolRevenue" --proxy=${PROXY}
+}
+
+getValidatorsStakeAmount() {
+    erdpy --verbose contract query ${ADDRESS} --function="getValidatorsStakeAmount" --proxy=${PROXY}
 }
 
 getRewardsInfoFinished() {

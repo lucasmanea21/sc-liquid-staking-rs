@@ -62,7 +62,7 @@ pub trait StakeContract:
     // Receives EGLD, mints and sends stEGLD
 
     #[only_owner]
-    #[endpoint]
+    #[endpoint(dailyDelegation)]
     fn daily_delegation(&self) {
         let mut delta = self.delta_stake().get();
         let validators = self.validators();
