@@ -37,7 +37,7 @@ pub trait StorageModule {
 
     #[view(getValidatorStakeAmount)]
     #[storage_mapper("validator_stake_amount")]
-    fn validator_stake_amount(&self, address: &ManagedAddress) -> SingleValueMapper<BigUint>;
+    fn validator_stake_amount(&self) -> MapMapper<ManagedAddress,BigUint>;
     
 
     // Stake
@@ -53,6 +53,10 @@ pub trait StorageModule {
     #[view(getExchangeRate)]
     #[storage_mapper("exchange_rate")]
     fn exchange_rate(&self) -> SingleValueMapper<BigUint>;
+
+    #[view(getMinValue)]
+    #[storage_mapper("min_value")]
+    fn min_value(&self) -> SingleValueMapper<BigUint>;
 
 
     #[view(getDeltaStake)]
@@ -98,6 +102,10 @@ pub trait StorageModule {
     #[storage_mapper("rewards_mapping_index")]
     fn rewards_mapping_index(&self) -> SingleValueMapper<usize>;
 
+    #[view(getWithdrawMappingIndex)]
+    #[storage_mapper("withdraw_mapping_index")]
+    fn withdraw_mapping_index(&self) -> SingleValueMapper<usize>;
+
     // Maintenance info
 
     #[view(getStakeAmounts)]
@@ -117,6 +125,10 @@ pub trait StorageModule {
     #[view(getRewardsInfoFinished)]
     #[storage_mapper("rewards_info_finished")]
     fn rewards_info_finished(&self) -> SingleValueMapper<bool>;
+
+    #[view(getWithdrawFinished)]
+    #[storage_mapper("withdraw_finished")]
+    fn withdraw_finished(&self) -> SingleValueMapper<bool>;
     
 
     // Tokens
@@ -135,8 +147,8 @@ pub trait StorageModule {
 
     #[only_owner]
     #[endpoint(setValidatorStakeAmount)]
-    fn set_validator_stake_amount(&self, validator: &ManagedAddress, amount: &BigUint) {
-        self.validator_stake_amount(&validator).set(amount);
+    fn set_validator_stake_amount(&self, validator: ManagedAddress, amount: BigUint) {
+        self.validator_stake_amount().insert(validator, amount);
     }
 
     #[only_owner]
@@ -173,6 +185,12 @@ pub trait StorageModule {
     #[endpoint(clearRewardsAmounts)]
     fn clear_rewards_amounts(&self) {
         self.rewards_amounts().clear();
+    }
+
+    #[only_owner]
+    #[endpoint(clearValidatorStakeAmounts)]
+    fn clear_validator_stake_amounts(&self) {
+        self.validator_stake_amount().clear();
     }
 
     #[only_owner]

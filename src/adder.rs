@@ -42,98 +42,8 @@ pub trait StakeContract:
         };
     }
 
-    // #[endpoint]
-    // fn daily_delegation(&self) {
-    //     // check if delta_stake is positive or not
-
-    //     /*
-    //         delta_stake is positive
-    //     */
-    //     // stakeable_validators = round::floor(delta_stake, 1)
-    //     // amount_per_validator = delta_stake / stakeable_validators
-    //     // interate through addresses and call delegate with amount_per_validator
-
-    //     /*
-    //         delta_stake is negative
-    //     */
-    //     // TODO
-    // }
 
     // Receives EGLD, mints and sends stEGLD
-
-    #[only_owner]
-    #[endpoint(dailyDelegation)]
-    fn daily_delegation(&self) {
-        let mut delta = self.delta_stake().get();
-        let validators = self.validators();
-        let validators_len = self.validators().len();
-
-        while delta > 0 && delta != 1 {
-            let MAX: u32 = <u32>::max_value();
-            let mut smallest_count = 0;
-            let mut smallest = BigUint::from(MAX as u32);
-            let mut second_smallest = BigUint::from(MAX as u32);
-
-            // Search for smallest and second_smallest
-            for validator in validators.iter() {
-                if self.validator_stake_amount(&validator).get() < smallest {
-                    second_smallest = smallest;
-                    smallest = self.validator_stake_amount(&validator).get();
-                } else if self.validator_stake_amount(&validator).get() < second_smallest
-                    && self.validator_stake_amount(&validator).get() != smallest
-                {
-                    second_smallest = self.validator_stake_amount(&validator).get();
-                }
-            }
-
-            // Calculate difference
-            let difference = second_smallest - &smallest;
-
-            // Count smallest in array
-            for validator in validators.iter() {
-                if self.validator_stake_amount(&validator).get() == smallest {
-                    smallest_count += 1;
-                }
-            }
-
-            // Max per item
-            let smallest_count_bigint = BigInt::from(smallest_count);
-            let max_per_validator = &delta / &smallest_count_bigint;
-
-            let max_per_validator_biguint = max_per_validator.magnitude();
-
-            let difference_bigint = BigInt::from(difference.clone());
-
-            // Update values in storage
-            for validator in validators.iter() {
-                if self.validator_stake_amount(&validator).get() == smallest {
-                    if difference_bigint > max_per_validator {
-                        let amount = self.validator_stake_amount(&validator).get();
-                        let new_value = &amount * &max_per_validator.magnitude();
-                        self.validator_stake_amount(&validator).set(&new_value);
-
-                        let value_validator=new_value-&amount;
-                        self.delegate_direct(validator, value_validator);
-                    } else {
-                        let amount = self.validator_stake_amount(&validator).get();
-                        let new_value = &amount * &difference;
-                        self.validator_stake_amount(&validator).set(&new_value);
-                        let value_validator=new_value-&amount;
-                        self.delegate_direct(validator, value_validator);
-                    }
-                }
-            }
-
-            //delta decrease
-
-            if difference_bigint > max_per_validator {
-                delta -= &max_per_validator * &smallest_count_bigint
-            } else {
-                delta -= &difference_bigint * &smallest_count_bigint;
-            }
-        }
-    }
-
     #[payable("EGLD")]
     #[endpoint]
     fn stake(&self) {
@@ -270,11 +180,7 @@ pub trait StakeContract:
         let mapping_index = self.mapping_index().get();
         let sc_address = self.blockchain().get_sc_address();
 
-        // let current_epoch_amounts: _= self.stake_amounts().iter().filter(|amount| amount.epoch == current_epoch).collect::<ManagedVec<StakeAmount<Self::Api>>>();
         let epoch_exists = self.stake_amounts().contains_key(&current_epoch);
-
-        // self.filtered_stake_amounts_length().set(&current_epoch_amounts.len());
-        // self.filtered_stake_amounts().set(&current_epoch_amounts);
 
         require!(
             !(epoch_exists && mapping_index == 1),
@@ -290,10 +196,10 @@ pub trait StakeContract:
 
         self.increment_index();
 
-        self.delegate_contract(wanted_address)
+        self.delegate_contract(wanted_address.clone())
             .getUserActiveStake(sc_address)
             .async_call()
-            .with_callback(StakeContract::callbacks(self).get_stake_callback(current_epoch))
+            .with_callback(StakeContract::callbacks(self).get_stake_callback(current_epoch,wanted_address.clone()))
             .call_and_exit();
     }
 
@@ -302,12 +208,13 @@ pub trait StakeContract:
     fn get_stake_callback(
         &self,
         current_epoch: u64,
+        validator: ManagedAddress,
         #[call_result] result: ManagedAsyncCallResult<BigUint>,
     ) {
+        let old_value = self.stake_amounts().get(&current_epoch);
+
         match result {
             ManagedAsyncCallResult::Ok(value) => {
-                let old_value = self.stake_amounts().get(&current_epoch);
-
                 self.stake_amounts().insert(
                     current_epoch,
                     match old_value {
@@ -316,9 +223,22 @@ pub trait StakeContract:
                     } + value.clone(),
                 );
 
+                self.validator_stake_amount().insert(
+                    validator,
+                    value.clone()
+                );
+
                 self.callback_result().set(&value);
             }
-            ManagedAsyncCallResult::Err(err) => {}
+            ManagedAsyncCallResult::Err(err) => {
+                self.stake_amounts().insert(
+                    current_epoch,
+                    match old_value {
+                        Some(n) => n,
+                        None => BigUint::from(0u64),
+                    } + BigUint::from(0u64),
+                );
+            }
         }
     }
 
@@ -335,8 +255,6 @@ pub trait StakeContract:
         // let current_epoch_amounts: _= self.stake_amounts().iter().filter(|amount| amount.epoch == current_epoch).collect::<ManagedVec<StakeAmount<Self::Api>>>();
         let epoch_exists = self.rewards_amounts().contains_key(&current_epoch);
 
-        // self.filtered_stake_amounts_length().set(&current_epoch_amounts.len());
-        // self.filtered_stake_amounts().set(&current_epoch_amounts);
 
         require!(
             !(epoch_exists && mapping_index == 1),
@@ -365,10 +283,11 @@ pub trait StakeContract:
         current_epoch: u64,
         #[call_result] result: ManagedAsyncCallResult<BigUint>,
     ) {
+        let old_value = self.rewards_amounts().get(&current_epoch);
+        let mapping_index = self.mapping_index().get();
+
         match result {
             ManagedAsyncCallResult::Ok(value) => {
-                let old_value = self.rewards_amounts().get(&current_epoch);
-                let mapping_index = self.mapping_index().get();
 
                 self.rewards_amounts().insert(
                     current_epoch,
@@ -380,11 +299,67 @@ pub trait StakeContract:
 
                 self.update_protocol_revenue(&current_epoch);
 
+                // iterate
+
+                
+
+    
+                
+
                 self.callback_result().set(&value);
             }
-            ManagedAsyncCallResult::Err(err) => {}
+            ManagedAsyncCallResult::Err(err) => {
+                self.rewards_amounts().insert(
+                    current_epoch,
+                    match old_value {
+                        Some(n) => n,
+                        None => BigUint::from(0u64),
+                    } + BigUint::from(0u64)
+                );
+
+                self.update_protocol_revenue(&current_epoch);
+            }
         }
     }
+
+    #[endpoint(dailyDelegation)]
+    fn daily_delegation(&self) {
+        // take mapping of validator and stake
+        
+
+        // find the one with the least amount
+        // find the one with the biggest amount
+
+        let delta_stake = self.delta_stake().get();
+
+        if delta_stake > 0 {
+            // stake to the one with least
+        } else {
+            // unstake all from the one with the most
+        }
+
+        // find the one with the least stake
+
+        // try to stake all to it
+    }
+
+    #[callback]
+    fn delegation_callback(
+        &self,
+        current_epoch: u64,
+        #[call_result] result: ManagedAsyncCallResult<BigUint>,
+    ) {
+        match result {
+            ManagedAsyncCallResult::Ok(value) => {
+                // perfect scenario, daily delegation is finished
+            }
+            ManagedAsyncCallResult::Err(err) => {
+             
+            }
+        }
+    }
+
+
 
     #[only_owner]
     #[endpoint]
@@ -458,6 +433,43 @@ pub trait StakeContract:
                 .with_gas_limit(7000000)
                 .transfer_execute();
         }
+    }
+
+    #[only_owner]
+    #[endpoint(withdrawTask)]
+    fn withdraw_task(&self) {
+        // solution for getting how much the SC has staked to validators inside the SC
+        // could be replaced with off-chain daemon
+
+        let current_epoch = self.blockchain().get_block_epoch();
+        let mapping_index = self.withdraw_mapping_index().get();
+        let sc_address = self.blockchain().get_sc_address();
+
+        // let current_epoch_amounts: _= self.stake_amounts().iter().filter(|amount| amount.epoch == current_epoch).collect::<ManagedVec<StakeAmount<Self::Api>>>();
+        let epoch_exists = self.rewards_amounts().contains_key(&current_epoch);
+
+        // self.filtered_stake_amounts_length().set(&current_epoch_amounts.len());
+        // self.filtered_stake_amounts().set(&current_epoch_amounts);
+
+        require!(
+            !(epoch_exists && mapping_index == 1),
+            "already got rewards amount this epoch"
+        );
+
+        if !epoch_exists {
+            self.rewards_mapping_index().set(1 as usize);
+            self.stake_info_finished().set(false);
+        };
+
+        let wanted_address = self.validators().get(mapping_index);
+
+        self.increment_index_rewards();
+
+        self.delegate_contract(wanted_address)
+            .getClaimableRewards(sc_address)
+            .async_call()
+            .with_callback(StakeContract::callbacks(self).get_rewards_callback(current_epoch))
+            .call_and_exit();
     }
 
     // #[only_owner]
