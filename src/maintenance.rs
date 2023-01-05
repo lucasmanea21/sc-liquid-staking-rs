@@ -1,9 +1,12 @@
+use elrond_wasm::api::HandleConstraints;
+
 elrond_wasm::imports!();
 elrond_wasm::derive_imports!();
 
 #[elrond_wasm::module]
 pub trait MaintenanceModule: 
-    crate::storage::StorageModule {
+    crate::storage::StorageModule 
+    {
 
         #[endpoint(distributeProtocolRevenue)]
         fn distribute_protocol_revenue(&self) {
@@ -54,5 +57,8 @@ pub trait MaintenanceModule:
             // get the array of validators with rewards
 
             // run algorithm to even out stake without removing any 
-        }
+
+
+        }        
+    
     }

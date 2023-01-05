@@ -322,26 +322,26 @@ pub trait StakeContract:
         }
     }
 
-    #[endpoint(dailyDelegation)]
-    fn daily_delegation(&self) {
-        // take mapping of validator and stake
+    // #[endpoint(dailyDelegation)]
+    // fn daily_delegation(&self) {
+    //     // take mapping of validator and stake
         
 
-        // find the one with the least amount
-        // find the one with the biggest amount
+    //     // find the one with the least amount
+    //     // find the one with the biggest amount
 
-        let delta_stake = self.delta_stake().get();
+    //     let delta_stake = self.delta_stake().get();
 
-        if delta_stake > 0 {
-            // stake to the one with least
-        } else {
-            // unstake all from the one with the most
-        }
+    //     if delta_stake > 0 {
+    //         // stake to the one with least
+    //     } else {
+    //         // unstake all from the one with the most
+    //     }
 
-        // find the one with the least stake
+    //     // find the one with the least stake
 
-        // try to stake all to it
-    }
+    //     // try to stake all to it
+    // }
 
     #[callback]
     fn delegation_callback(
@@ -357,14 +357,6 @@ pub trait StakeContract:
              
             }
         }
-    }
-
-
-
-    #[only_owner]
-    #[endpoint]
-    fn push_validators(&self, address: &ManagedAddress) {
-        self.validators().push(address);
     }
 
     #[only_owner]
@@ -488,4 +480,66 @@ pub trait StakeContract:
     //     self.send().direct_esdt(&owner, &st_egld_id, 0, &protocol_rewards);
 
     // }
+
+    #[only_owner]
+    #[endpoint]
+    fn push_validators(&self, address: &ManagedAddress) {
+        self.validators().push(address);
+    }
+
+    #[endpoint(dailyDelegation)]
+    fn daily_delegation(&self) {
+        // take mapping of validator and stake
+        
+        let validators = self.validator_stake_amount();
+        let mut smallest = BigUint::from(0u64);
+        let mut biggest = BigUint::from(0u64);
+        let delta_stake = self.delta_stake().get();
+
+
+        // set smallest as 1st entry
+        for validator in validators.values() {
+            smallest = validator;
+            break;
+        }
+
+        // set biggest as 1st entry
+        for validator in validators.values() {
+            biggest = validator;
+            break;
+        }
+
+        // find the one with the least amount [smallest]
+        for validator in validators.values() {
+            if validator < smallest{
+                smallest = validator; //find smallest
+            }
+        }
+
+        // self.flag().set(smallest); //delete
+
+        //find the one with the biggest amount [biggest]
+        for validator in validators.values() {
+            if validator > biggest{
+                biggest = validator; //find biggest
+            } 
+        }
+
+        if delta_stake > 0 {
+            // stake to the one with least
+            for validator in validators.iter() {
+                if validator.1 == smallest {
+                   self.delegate_direct(validator.0 , delta_stake.magnitude());
+                   break;
+                } 
+            }
+        } else {
+            // unstake all from the one with the most
+        }
+
+        // find the one with the least stake
+
+        // try to stake all to it
+    }
+
 }

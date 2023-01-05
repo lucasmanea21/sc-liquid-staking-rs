@@ -38,6 +38,11 @@ pub trait StorageModule {
     #[view(getValidatorStakeAmount)]
     #[storage_mapper("validator_stake_amount")]
     fn validator_stake_amount(&self) -> MapMapper<ManagedAddress,BigUint>;
+
+    //delete
+    #[view(getFlag)]
+    #[storage_mapper("flag")]
+    fn flag(&self) -> SingleValueMapper<BigUint>;
     
 
     // Stake
