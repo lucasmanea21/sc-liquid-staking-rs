@@ -101,12 +101,12 @@ redelegate() {
 
 setDeltaStake() {
     erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="setDeltaStake" \
-        --arguments=0xDE0B6B3A7640000 --send --proxy=${PROXY} --chain=${CHAIN_ID}
+        --arguments=0x00 --send --proxy=${PROXY} --chain=${CHAIN_ID}
 }
 
 # 0xDE0B6B3A7640000 = 1 egld
 # 0x8ac7230489e80000 = 10 egld
-
+# 0xF21F494C589C0000 = -1
 getStakeAdmin() {
     erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="getStakeAdmin" \
         --send --proxy=${PROXY} --chain=${CHAIN_ID}

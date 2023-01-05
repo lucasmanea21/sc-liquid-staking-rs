@@ -301,11 +301,6 @@ pub trait StakeContract:
 
                 // iterate
 
-                
-
-    
-                
-
                 self.callback_result().set(&value);
             }
             ManagedAsyncCallResult::Err(err) => {
@@ -347,14 +342,16 @@ pub trait StakeContract:
     fn delegation_callback(
         &self,
         current_epoch: u64,
+        address:ManagedAddress,
         #[call_result] result: ManagedAsyncCallResult<BigUint>,
     ) {
         match result {
             ManagedAsyncCallResult::Ok(value) => {
                 // perfect scenario, daily delegation is finished
+                self.delta_stake().clear();
             }
             ManagedAsyncCallResult::Err(err) => {
-             
+                self.validator_stake_amount().remove(&address);
             }
         }
     }
@@ -383,10 +380,11 @@ pub trait StakeContract:
     #[endpoint(delegate_direct)]
     fn delegate_direct(&self, address: ManagedAddress, amount: BigUint) {
         // directly delegates to the contract specified.
+        let current_epoch = self.blockchain().get_block_epoch();
 
-        self.delegate_contract(address)
+        self.delegate_contract(address.clone() )
             .delegate(EgldOrEsdtTokenIdentifier::egld(), amount)
-            .async_call()
+            .async_call().with_callback(StakeContract::callbacks(self).delegation_callback(current_epoch, address))
             .call_and_exit();
     }
 
@@ -394,10 +392,11 @@ pub trait StakeContract:
     #[endpoint]
     fn undelegate_direct(&self, address: ManagedAddress, amount: &BigUint) {
         // directly undelegates from the contract specified.
+        let current_epoch = self.blockchain().get_block_epoch();
 
-        self.delegate_contract(address)
+        self.delegate_contract(address.clone())
             .unDelegate(amount)
-            .async_call()
+            .async_call().with_callback(StakeContract::callbacks(self).delegation_callback(current_epoch, address))
             .call_and_exit();
     }
 
@@ -516,8 +515,6 @@ pub trait StakeContract:
             }
         }
 
-        // self.flag().set(smallest); //delete
-
         //find the one with the biggest amount [biggest]
         for validator in validators.values() {
             if validator > biggest{
@@ -533,13 +530,15 @@ pub trait StakeContract:
                    break;
                 } 
             }
-        } else {
-            // unstake all from the one with the most
+        } else if delta_stake < 0 {
+            // unstake delta from the one with the most
+            for validator in validators.iter() {
+                if validator.1 == biggest {
+                   self.undelegate_direct(validator.0 , &delta_stake.magnitude());
+                   break;
+                } 
+            }
         }
-
-        // find the one with the least stake
-
-        // try to stake all to it
     }
 
 }
