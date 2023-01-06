@@ -162,9 +162,10 @@ pub trait StakeContract:
 
         let rewards_fetched = self.rewards_info_finished().contains(&current_epoch);
         let redelegate_finished = self.redelegate_finished().contains(&current_epoch);
-
+        let delegation_finished = self.daily_delegation_finished().contains(&current_epoch);
 
         require!(rewards_fetched, "must fetch rewards first");
+        require!(delegation_finished, "must complete daily delegation first");
         require!(redelegate_finished, "must redelegate rewards first");
 
         require!(
@@ -209,7 +210,12 @@ pub trait StakeContract:
                 );
 
                 self.validator_stake_amount().insert(
-                    validator,
+                    validator.clone(),
+                    value.clone()
+                );
+
+                self.validator_stake_amount_clone().insert(
+                    validator.clone(),
                     value.clone()
                 );
             }
@@ -220,6 +226,17 @@ pub trait StakeContract:
                         Some(n) => n,
                         None => BigUint::from(0u64),
                     } + BigUint::from(0u64),
+                );
+
+                // todo: check if it can only signal errors for not having any stake
+                self.validator_stake_amount().insert(
+                    validator.clone(),
+                    BigUint::from(0u64)
+                );
+
+                self.validator_stake_amount_clone().insert(
+                    validator.clone(),
+                    BigUint::from(0u64)
                 );
             }
         }
@@ -295,63 +312,23 @@ pub trait StakeContract:
         }
     }
 
-    // #[endpoint(dailyDelegation)]
-    // fn daily_delegation(&self) {
-    //     // take mapping of validator and stake
-        
-
-    //     // find the one with the least amount
-    //     // find the one with the biggest amount
-
-    //     let delta_stake = self.delta_stake().get();
-
-    //     if delta_stake > 0 {
-    //         // stake to the one with least
-    //     } else {
-    //         // unstake all from the one with the most
-    //     }
-
-    //     // find the one with the least stake
-
-    //     // try to stake all to it
-    // }
-
     #[callback]
     fn delegation_callback(
         &self,
         current_epoch: u64,
         address:ManagedAddress,
-        #[call_result] result: ManagedAsyncCallResult<BigUint>,
+        #[call_result] result: ManagedAsyncCallResult<()>,
     ) {
         match result {
-            ManagedAsyncCallResult::Ok(value) => {
+            ManagedAsyncCallResult::Ok(()) => {
                 // perfect scenario, daily delegation is finished
                 self.delta_stake().clear();
+                self.daily_delegation_finished().insert(current_epoch);
             }
             ManagedAsyncCallResult::Err(err) => {
-                self.validator_stake_amount().remove(&address);
+                self.validator_stake_amount_clone().remove(&address);
             }
         }
-    }
-
-    #[only_owner]
-    #[endpoint(delegateAdmin)]
-    fn delegate_admin(&self, amount: BigUint) {
-        // solution for on-chain delegation
-
-        let mapping_index = self.mapping_index().get();
-        let wanted_address = self.validators().get(mapping_index);
-
-        self.mapping_index().set(&mapping_index + 1);
-
-        if &mapping_index >= &(self.validators().len() - 1) {
-            self.mapping_index().set(1 as usize);
-        }
-
-        self.delegate_contract(wanted_address)
-            .delegate(EgldOrEsdtTokenIdentifier::egld(), amount)
-            .async_call()
-            .call_and_exit();
     }
 
     #[only_owner]
@@ -484,50 +461,59 @@ pub trait StakeContract:
 
     #[endpoint(dailyDelegation)]
     fn daily_delegation(&self) {
-        // take mapping of validator and stake
-        
-        let validators = self.validator_stake_amount();
         let mut smallest = BigUint::from(0u64);
         let mut biggest = BigUint::from(0u64);
+        let current_epoch = self.blockchain().get_block_epoch();
         let delta_stake = self.delta_stake().get();
 
+        let validators= self.validator_stake_amount_clone();
 
-        // set smallest as 1st entry
-        for validator in validators.values() {
-            smallest = validator;
-            break;
+
+        let is_smaller_than_minimum = (delta_stake > 0 && delta_stake < BigInt::from(10_i64.pow(18)));
+        
+        if (is_smaller_than_minimum) {
+            self.daily_delegation_finished().insert(current_epoch.clone());
         }
 
-        // set biggest as 1st entry
-        for validator in validators.values() {
-            biggest = validator;
-            break;
-        }
+        require!(!is_smaller_than_minimum, "delta_stake is too small to delegate");
+        require!(delta_stake != 0, "delta_stake is 0");
 
-        // find the one with the least amount [smallest]
-        for validator in validators.values() {
-            if validator < smallest{
-                smallest = validator; //find smallest
-            }
-        }
-
-        //find the one with the biggest amount [biggest]
-        for validator in validators.values() {
-            if validator > biggest{
-                biggest = validator; //find biggest
-            } 
-        }
 
         if delta_stake > 0 {
-            // stake to the one with least
+            // set smallest as 1st entry
+            for validator in validators.values() {
+                smallest = validator;
+                break;
+            }
+
+             // find the one with the least amount [smallest]
+            for validator in validators.values() {
+                if validator < smallest{
+                    smallest = validator; //find smallest
+                }
+            }
+
             for validator in validators.iter() {
                 if validator.1 == smallest {
                    self.delegate_direct(validator.0 , delta_stake.magnitude());
                    break;
                 } 
             }
+
         } else if delta_stake < 0 {
-            // unstake delta from the one with the most
+            // set biggest as 1st entry
+            for validator in validators.values() {
+                biggest = validator;
+                break;
+            }
+        
+            //find the one with the biggest amount [biggest]
+            for validator in validators.values() {
+                if validator > biggest{
+                    biggest = validator; //find biggest
+                } 
+            }
+            
             for validator in validators.iter() {
                 if validator.1 == biggest {
                    self.undelegate_direct(validator.0 , &delta_stake.magnitude());

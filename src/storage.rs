@@ -31,6 +31,13 @@ pub trait StorageModule {
     #[storage_mapper("validator_stake_amount")]
     fn validator_stake_amount(&self) -> MapMapper<ManagedAddress,BigUint>;
 
+    // this "clone" is used for removing full validators, 
+    // so the delegation process can still take place
+
+    #[view(getValidatorStakeAmountClone)]
+    #[storage_mapper("validator_stake_amount_clone")]
+    fn validator_stake_amount_clone(&self) -> MapMapper<ManagedAddress,BigUint>;
+
     //delete
     #[view(getFlag)]
     #[storage_mapper("flag")]
@@ -93,7 +100,7 @@ pub trait StorageModule {
 
     #[view(getStakeValue)]
     #[storage_mapper("stake_value")]
-    fn stake_value(&self) -> SingleValueMapper<BigUint>;
+    fn stake_value(&self) -> SingleValueMapper<BigInt>;
 
     #[view(getRedelegateMappingIndex)]
     #[storage_mapper("redelegate_mapping_index")]
@@ -129,6 +136,10 @@ pub trait StorageModule {
     #[view(getExchangeRateUpdateFinished)]
     #[storage_mapper("exchange_rate_update_finished")]
     fn exchange_rate_update_finished(&self) -> SetMapper<u64>;
+
+    #[view(getDailyDelegationFinished)]
+    #[storage_mapper("daily_delegation_finished")]
+    fn daily_delegation_finished(&self) -> SetMapper<u64>;
 
 
     #[view(getStakeInfoStarted)]

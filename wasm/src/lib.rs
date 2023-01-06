@@ -15,9 +15,9 @@ elrond_wasm_node::wasm_endpoints! {
         clearValidatorStakeAmounts
         clearValidators
         dailyDelegation
-        delegateAdmin
         delegate_direct
         distributeProtocolRevenue
+        getDailyDelegationFinished
         getDeltaStake
         getExchangeRate
         getExchangeRateMultiplier
@@ -46,6 +46,7 @@ elrond_wasm_node::wasm_endpoints! {
         getTotalTokenSupply
         getUEgldId
         getValidatorStakeAmount
+        getValidatorStakeAmountClone
         getValidators
         getValidatorsCount
         getWithdrawFinished

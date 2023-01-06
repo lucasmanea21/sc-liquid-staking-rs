@@ -3,7 +3,7 @@ MY_ADDRESS=erd1epacy29dkrkqaeju3k59z45rdq5c9a2dv4qs0t0992d32prx623slv5fq5
 ADDRESS=$(erdpy data load --key=address-testnet)
 ADDRESS_HEX="$(erdpy wallet bech32 --decode ${ADDRESS})"
 
-DELEGATION_ADDRESS=erd1qqqqqqqqqqqqqqqpqqqqqqqqqqqqqqqqqqqqqqqqqqqqqr8llllse9cj2t
+DELEGATION_ADDRESS=erd1qqqqqqqqqqqqqqqpqqqqqqqqqqqqqqqqqqqqqqqqqqqqqxhllllssz7sl7
 DELEGATION_ADDRESS_HEX="$(erdpy wallet bech32 --decode ${DELEGATION_ADDRESS})"
 
 DEPLOY_TRANSACTION=$(erdpy data load --key=deployTransaction-testnet)
@@ -204,6 +204,10 @@ getValidatorStakeAmount() {
     erdpy --verbose contract query ${ADDRESS} --function="getValidatorStakeAmount" --proxy=${PROXY}
 }
 
+getValidatorStakeAmountClone() {
+    erdpy --verbose contract query ${ADDRESS} --function="getValidatorStakeAmountClone" --proxy=${PROXY}
+}
+
 getRewardsInfoFinished() {
     erdpy --verbose contract query ${ADDRESS} --function="getRewardsInfoFinished" --proxy=${PROXY}
 }
@@ -275,6 +279,10 @@ getExchangeRate() {
 
 getExchangeRateMultiplier() {
     erdpy --verbose contract query ${ADDRESS} --function="getExchangeRateMultiplier" --proxy=${PROXY}
+}
+
+getDailyDelegationFinished() {
+    erdpy --verbose contract query ${ADDRESS} --function="getDailyDelegationFinished" --proxy=${PROXY}
 }
 
 getUEgldId() {
