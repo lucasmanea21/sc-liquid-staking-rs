@@ -23,14 +23,6 @@ pub trait StorageModule {
         self.validators().len();
     }
 
-    #[view(getEpochValidators)]
-    #[storage_mapper("epoch_validators")]
-    fn epoch_validators(&self) -> VecMapper<ManagedAddress>;
-
-    #[view(getUsedValidators)]
-    #[storage_mapper("used_validators")]
-    fn used_validators(&self) -> UnorderedSetMapper<ManagedAddress>;
-
     #[view(getValidators)]
     #[storage_mapper("validators")]
     fn validators(&self) -> VecMapper<ManagedAddress>;
@@ -59,33 +51,21 @@ pub trait StorageModule {
     #[storage_mapper("exchange_rate")]
     fn exchange_rate(&self) -> SingleValueMapper<BigUint>;
 
+    #[view(getExchangeRateMultiplier)]
+    #[storage_mapper("exchange_rate_multiplier")]
+    fn exchange_rate_multiplier(&self) -> SingleValueMapper<BigUint>;
+
     #[view(getMinValue)]
     #[storage_mapper("min_value")]
     fn min_value(&self) -> SingleValueMapper<BigUint>;
-
 
     #[view(getDeltaStake)]
     #[storage_mapper("delta_stake")]
     fn delta_stake(&self) -> SingleValueMapper<BigInt>;
 
-
-    #[view(getFilteredStakeAmountsLength)]
-    #[storage_mapper("filtered_stake_amounts_length")]
-    fn filtered_stake_amounts_length(&self) -> SingleValueMapper<usize>;
-
-
-    #[view(getFilteredStakeAmounts)]
-    #[storage_mapper("filtered_stake_amounts")]
-    fn filtered_stake_amounts(&self) -> SingleValueMapper<ManagedVec<StakeAmount<Self::Api>>>;
-
     #[view(getRewardsAmount)]
     #[storage_mapper("rewards_amount")]
     fn rewards_amount(&self) -> VecMapper<RewardsAmount<Self::Api>>;
-
-
-    #[view(getCallbackResult)]
-    #[storage_mapper("callback_result")]
-    fn callback_result(&self) -> SingleValueMapper<BigUint>;
 
     #[view(getProtocolRevenue)]
     #[storage_mapper("protocol_revenue")]
@@ -111,6 +91,14 @@ pub trait StorageModule {
     #[storage_mapper("withdraw_mapping_index")]
     fn withdraw_mapping_index(&self) -> SingleValueMapper<usize>;
 
+    #[view(getStakeValue)]
+    #[storage_mapper("stake_value")]
+    fn stake_value(&self) -> SingleValueMapper<BigUint>;
+
+    #[view(getRedelegateMappingIndex)]
+    #[storage_mapper("redelegate_mapping_index")]
+    fn redelegate_mapping_index(&self) -> SingleValueMapper<usize>;
+
     // Maintenance info
 
     #[view(getStakeAmounts)]
@@ -124,16 +112,41 @@ pub trait StorageModule {
 
     #[view(getStakeInfoFinished)]
     #[storage_mapper("stake_info_finished")]
-    fn stake_info_finished(&self) -> SingleValueMapper<bool>;
-
+    fn stake_info_finished(&self) -> SetMapper<u64>;
 
     #[view(getRewardsInfoFinished)]
     #[storage_mapper("rewards_info_finished")]
-    fn rewards_info_finished(&self) -> SingleValueMapper<bool>;
+    fn rewards_info_finished(&self) -> SetMapper<u64>;
 
     #[view(getWithdrawFinished)]
     #[storage_mapper("withdraw_finished")]
-    fn withdraw_finished(&self) -> SingleValueMapper<bool>;
+    fn withdraw_finished(&self) -> SetMapper<u64>;
+
+    #[view(getRedelegateFinished)]
+    #[storage_mapper("redelegate_finished")]
+    fn redelegate_finished(&self) -> SetMapper<u64>;
+
+    #[view(getExchangeRateUpdateFinished)]
+    #[storage_mapper("exchange_rate_update_finished")]
+    fn exchange_rate_update_finished(&self) -> SetMapper<u64>;
+
+
+    #[view(getStakeInfoStarted)]
+    #[storage_mapper("stake_info_started")]
+    fn stake_info_started(&self) -> SetMapper<u64>;
+
+    #[view(getRewardsInfoStarted)]
+    #[storage_mapper("rewards_info_started")]
+    fn rewards_info_started(&self) -> SetMapper<u64>;
+
+    #[view(getWithdrawStarted)]
+    #[storage_mapper("withdraw_started")]
+    fn withdraw_started(&self) -> SetMapper<u64>;
+
+    #[view(getRedelegateStarted)]
+    #[storage_mapper("redelegate_started")]
+    fn redelegate_started(&self) -> SetMapper<u64>;
+    
     
 
     // Tokens
@@ -190,6 +203,19 @@ pub trait StorageModule {
     #[endpoint(clearRewardsAmounts)]
     fn clear_rewards_amounts(&self) {
         self.rewards_amounts().clear();
+    }
+
+
+    #[only_owner]
+    #[endpoint(clearRewardsFinished)]
+    fn clear_rewards_finished(&self) {
+        self.rewards_info_finished().clear();
+    }
+
+    #[only_owner]
+    #[endpoint(clearRewardsStarted)]
+    fn clear_rewards_started(&self) {
+        self.rewards_info_started().clear();
     }
 
     #[only_owner]

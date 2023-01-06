@@ -30,26 +30,32 @@ pub trait MaintenanceModule:
        
         #[endpoint(updateExchangeRate)]
         fn update_exchange_rate(&self) {
-            // todo: require all other operations have finished: get rewards, redelegation, delegation , get total staked
             let current_epoch = self.blockchain().get_block_epoch(); 
-            let rewards_value = self.rewards_amounts().get(&current_epoch);
+            let already_updated = self.exchange_rate_update_finished().contains(&current_epoch);
+
+            require!(!already_updated, "Exchange rate already updated for this epoch");
+
+            let stake_info_finished = self.stake_info_finished().contains(&current_epoch);
+            let rewards_info_finished = self.rewards_info_finished().contains(&current_epoch);
+            let withdraw_finished = self.withdraw_finished().contains(&current_epoch);
+            
+            require!(
+                stake_info_finished && rewards_info_finished && withdraw_finished,
+                "All operations must be finished before updating exchange rate"
+            );
+
             let stake_value = self.stake_amounts().get(&current_epoch);
             let total_token_supply = self.total_token_supply().get();
+            let exchange_rate_multiplier = self.exchange_rate_multiplier().get();
     
-    
-            require!(match rewards_value {
-                Some(n) => true, 
-                None => false
-            }, "didn't get rewards this epoch");
-    
-            require!(match stake_value.clone() {
-                Some(n) => true,
-                None => false
-            }, "didn't get total stake this epoch");
-    
-        
-    
-            self.exchange_rate().set(&total_token_supply / &stake_value.unwrap_or(BigUint::from(1u64)));
+            self.exchange_rate().set((total_token_supply * exchange_rate_multiplier) / 
+               (match stake_value {
+                    Some(n) => if n > 0 { n } else { BigUint::from(1u64) },
+                    None => BigUint::from(1u64),
+                })
+            );
+
+            self.exchange_rate_update_finished().insert(current_epoch);
         }
 
         #[inline]

@@ -40,6 +40,18 @@ pub trait StakeContract:
         if self.mapping_index().is_empty() {
             self.mapping_index().set(1 as usize)
         };
+        if self.withdraw_mapping_index().is_empty() {
+            self.withdraw_mapping_index().set(1 as usize)
+        };
+        if self.rewards_mapping_index().is_empty() {
+            self.rewards_mapping_index().set(1 as usize)
+        };
+        if self.redelegate_mapping_index().is_empty() {
+            self.redelegate_mapping_index().set(1 as usize)
+        };
+        if self.exchange_rate_multiplier().is_empty() {
+            self.exchange_rate_multiplier().set(BigUint::from(10u64.pow(18)))
+        };
     }
 
 
@@ -53,9 +65,10 @@ pub trait StakeContract:
 
         let caller = self.blockchain().get_caller();
         let exchange_rate = self.exchange_rate().get();
+        let exchange_rate_multiplier = self.exchange_rate_multiplier().get();
 
         let st_egld_id = self.staked_egld_id().get();
-        let st_egld_amount = exchange_rate * &value;
+        let st_egld_amount = exchange_rate * &value / exchange_rate_multiplier;
 
         let current_total_supply = self.total_token_supply().get();
         let current_delta_stake = self.delta_stake().get();
@@ -95,12 +108,13 @@ pub trait StakeContract:
             mint uEGLD based on exchange rate (mint the EGLD equivalent)
         */
         let exchange_rate = self.exchange_rate().get();
+        let exchange_rate_multiplier = self.exchange_rate_multiplier().get();
 
         let attr = &TokenAttributes {
             epoch: self.blockchain().get_block_epoch(),
         };
 
-        self.create_and_send_assets(&payment / &exchange_rate, &caller, &attr);
+        self.create_and_send_assets(&payment / &exchange_rate * exchange_rate_multiplier, &caller, &attr);
     }
 
     #[payable("*")]
@@ -135,52 +149,23 @@ pub trait StakeContract:
     // Admin operations
     // todo: move all to admin.rs file
 
-    /*
-        Endpoint for delegating EGLD to validators, claiming rewards and other maintenance actions.
-
-        Could be replaced by a bot that provides that info, so contract itself won't have to make all the calls.
-    */
-
-    #[only_owner]
-    #[endpoint]
-    fn delegate_test(&self) {
-        // solution for delegating inside SC
-        // todo: make this work
-        // requires there hasn't been a delegation this epoch
-
-        let validators = self.validators();
-        let mut epoch_validators = self.epoch_validators();
-
-        if epoch_validators.len() == 0 {
-            for validator in validators.iter() {
-                epoch_validators.push(&validator);
-            }
-        }
-
-        // todo: replace balance with delta_stake -> delta stake will not change when delegation happens, so amount will be consistent
-        let balance = self
-            .blockchain()
-            .get_sc_balance(&EgldOrEsdtTokenIdentifier::egld(), 0);
-        let length = validators.len();
-        let amount_per_validator = BigUint::from(balance / BigUint::from(length));
-
-        self.delegate_contract(epoch_validators.get(1))
-            .delegate(EgldOrEsdtTokenIdentifier::egld(), amount_per_validator)
-            .async_call()
-            .call_and_exit();
-    }
+    // solution for getting how much the SC has staked to validators inside the SC
+    // could be replaced with off-chain daemon
 
     #[only_owner]
     #[endpoint(getStakeAdmin)]
     fn get_stake_admin(&self) {
-        // solution for getting how much the SC has staked to validators inside the SC
-        // could be replaced with off-chain daemon
-
         let current_epoch = self.blockchain().get_block_epoch();
         let mapping_index = self.mapping_index().get();
         let sc_address = self.blockchain().get_sc_address();
+        let epoch_exists = self.stake_info_started().contains(&current_epoch);
 
-        let epoch_exists = self.stake_amounts().contains_key(&current_epoch);
+        let rewards_fetched = self.rewards_info_finished().contains(&current_epoch);
+        let redelegate_finished = self.redelegate_finished().contains(&current_epoch);
+
+
+        require!(rewards_fetched, "must fetch rewards first");
+        require!(redelegate_finished, "must redelegate rewards first");
 
         require!(
             !(epoch_exists && mapping_index == 1),
@@ -189,7 +174,7 @@ pub trait StakeContract:
 
         if !epoch_exists {
             self.mapping_index().set(1 as usize);
-            self.stake_info_finished().set(false);
+            self.stake_info_started().insert(current_epoch.clone());
         };
 
         let wanted_address = self.validators().get(mapping_index);
@@ -227,8 +212,6 @@ pub trait StakeContract:
                     validator,
                     value.clone()
                 );
-
-                self.callback_result().set(&value);
             }
             ManagedAsyncCallResult::Err(err) => {
                 self.stake_amounts().insert(
@@ -253,8 +236,7 @@ pub trait StakeContract:
         let sc_address = self.blockchain().get_sc_address();
 
         // let current_epoch_amounts: _= self.stake_amounts().iter().filter(|amount| amount.epoch == current_epoch).collect::<ManagedVec<StakeAmount<Self::Api>>>();
-        let epoch_exists = self.rewards_amounts().contains_key(&current_epoch);
-
+        let epoch_exists = self.rewards_info_started().contains(&current_epoch);
 
         require!(
             !(epoch_exists && mapping_index == 1),
@@ -263,7 +245,7 @@ pub trait StakeContract:
 
         if !epoch_exists {
             self.rewards_mapping_index().set(1 as usize);
-            self.stake_info_finished().set(false);
+            self.rewards_info_started().insert(current_epoch.clone());
         };
 
         let wanted_address = self.validators().get(mapping_index);
@@ -298,10 +280,6 @@ pub trait StakeContract:
                 );
 
                 self.update_protocol_revenue(&current_epoch);
-
-                // iterate
-
-                self.callback_result().set(&value);
             }
             ManagedAsyncCallResult::Err(err) => {
                 self.rewards_amounts().insert(
@@ -400,47 +378,69 @@ pub trait StakeContract:
             .call_and_exit();
     }
 
+
+    // redelegates rewards at each validator.
+    // should be done after computing rewards
+
     #[only_owner]
-    #[endpoint(redelegate)]
-    fn redelegate(&self) {
-        // redelegates rewards at each validator.
-        // should be done after computing rewards
-
+    #[endpoint(redelegateAdmin)]
+    fn redelegateAdmin(&self) {
+        let mapping_index = self.redelegate_mapping_index().get();
         let current_epoch = self.blockchain().get_block_epoch();
-        let epoch_exists = self.rewards_amounts().contains_key(&current_epoch);
-        let is_rewards_info_finished = self.rewards_info_finished().get();
         let validators = self.validators();
-
-        // todo: stop it from running twice in an epoch
+        let epoch_exists = self.redelegate_started().contains(&current_epoch);
+        
+        let is_rewards_info_finished = self.rewards_info_finished().contains(&current_epoch);
+        let wanted_address = self.validators().get(mapping_index);
 
         require!(
-            epoch_exists && is_rewards_info_finished,
+            is_rewards_info_finished,
             "must get rewards first"
         );
+        
+        require!(
+            !(epoch_exists && mapping_index == 1),
+            "already redelegated"
+        );
 
-        for address in validators.iter() {
-            self.delegate_contract(address)
-                .reDelegateRewards()
-                .with_gas_limit(7000000)
-                .transfer_execute();
+        if !epoch_exists {
+            self.mapping_index().set(1 as usize);
+            self.redelegate_started().insert(current_epoch.clone());
+        };
+
+        self.increment_index_redelegate();
+
+        self.delegate_contract(wanted_address)
+            .reDelegateRewards()
+            .async_call()
+            .with_callback(StakeContract::callbacks(self).redelegate_callback(current_epoch, mapping_index))
+            .call_and_exit();
+    }
+
+    #[callback]
+    fn redelegate_callback(
+        &self,
+        current_epoch: u64,
+        mapping_index: usize,
+        #[call_result] result: ManagedAsyncCallResult<BigUint>,
+    ) {
+        // if mapping index is 1, it means it was the last one
+        if &mapping_index == &(1 as usize) {
+            self.redelegate_finished().insert(current_epoch);
         }
     }
 
     #[only_owner]
-    #[endpoint(withdrawTask)]
-    fn withdraw_task(&self) {
+    #[endpoint(withdrawAdmin)]
+    fn withdraw_admin(&self) {
         // solution for getting how much the SC has staked to validators inside the SC
         // could be replaced with off-chain daemon
 
         let current_epoch = self.blockchain().get_block_epoch();
         let mapping_index = self.withdraw_mapping_index().get();
         let sc_address = self.blockchain().get_sc_address();
-
-        // let current_epoch_amounts: _= self.stake_amounts().iter().filter(|amount| amount.epoch == current_epoch).collect::<ManagedVec<StakeAmount<Self::Api>>>();
-        let epoch_exists = self.rewards_amounts().contains_key(&current_epoch);
-
-        // self.filtered_stake_amounts_length().set(&current_epoch_amounts.len());
-        // self.filtered_stake_amounts().set(&current_epoch_amounts);
+    
+        let epoch_exists = self.withdraw_started().contains(&current_epoch);
 
         require!(
             !(epoch_exists && mapping_index == 1),
@@ -448,37 +448,33 @@ pub trait StakeContract:
         );
 
         if !epoch_exists {
-            self.rewards_mapping_index().set(1 as usize);
-            self.stake_info_finished().set(false);
+            self.withdraw_mapping_index().set(1 as usize);
+            self.withdraw_started().insert(current_epoch);
         };
 
         let wanted_address = self.validators().get(mapping_index);
 
-        self.increment_index_rewards();
+        self.increment_index_withdraw();
 
         self.delegate_contract(wanted_address)
-            .getClaimableRewards(sc_address)
+            .withdraw()
             .async_call()
-            .with_callback(StakeContract::callbacks(self).get_rewards_callback(current_epoch))
+            .with_callback(StakeContract::callbacks(self).withdraw_callback(current_epoch, mapping_index))
             .call_and_exit();
     }
 
-    // #[only_owner]
-    // #[endpoint(claimProtocolRewards)]
-    // fn claim_protocol_rewards(&self) {
-    //     // based on the rewards amount of the epoch, mint 7.5% of it of stEGLD
-
-    //     let rewards = self.rewards_amount().get();
-    //     let protocol_fee = self.service_fee().get();
-    //     let protocol_rewards = (protocol_fee / 1000)* rewards;
-    //     let owner = self.blockchain().get_owner_address();
-
-    //     let st_egld_id = self.staked_egld_id().get();
-
-    //     self.send().esdt_local_mint(&st_egld_id, 0, &protocol_rewards);
-    //     self.send().direct_esdt(&owner, &st_egld_id, 0, &protocol_rewards);
-
-    // }
+    #[callback]
+    fn withdraw_callback(
+        &self,
+        current_epoch: u64,
+        mapping_index: usize,
+        #[call_result] result: ManagedAsyncCallResult<BigUint>,
+    ) {
+        // if mapping index is 1, it means it was the last one
+        if &mapping_index == &(1 as usize) {
+            self.withdraw_finished().insert(current_epoch);
+        }
+    }
 
     #[only_owner]
     #[endpoint]

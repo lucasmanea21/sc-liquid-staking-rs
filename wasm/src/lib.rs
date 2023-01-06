@@ -10,46 +10,51 @@ elrond_wasm_node::wasm_endpoints! {
         callBack
         claim
         clearRewardsAmounts
+        clearRewardsFinished
+        clearRewardsStarted
         clearValidatorStakeAmounts
         clearValidators
         dailyDelegation
         delegateAdmin
         delegate_direct
-        delegate_test
         distributeProtocolRevenue
-        getCallbackResult
         getDeltaStake
-        getEpochValidators
         getExchangeRate
-        getFilteredStakeAmounts
-        getFilteredStakeAmountsLength
+        getExchangeRateMultiplier
+        getExchangeRateUpdateFinished
         getFlag
         getMappingIndex
         getMinValue
         getProtocolRevenue
+        getRedelegateFinished
+        getRedelegateMappingIndex
+        getRedelegateStarted
         getRewardsAdmin
         getRewardsAmount
         getRewardsAmounts
         getRewardsInfoFinished
+        getRewardsInfoStarted
         getRewardsMappingIndex
         getServiceFee
         getStEgldId
         getStakeAdmin
         getStakeAmounts
         getStakeInfoFinished
+        getStakeInfoStarted
+        getStakeValue
         getTotalStaked
         getTotalTokenSupply
         getUEgldId
-        getUsedValidators
         getValidatorStakeAmount
         getValidators
         getValidatorsCount
         getWithdrawFinished
         getWithdrawMappingIndex
+        getWithdrawStarted
         issueToken
         issueUndelegatedToken
         push_validators
-        redelegate
+        redelegateAdmin
         setDeltaStake
         setLocalRoles
         setMappingIndex
@@ -61,6 +66,6 @@ elrond_wasm_node::wasm_endpoints! {
         undelegate_direct
         unstake
         updateExchangeRate
-        withdrawTask
+        withdrawAdmin
     )
 }

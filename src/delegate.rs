@@ -33,4 +33,7 @@ pub trait Delegate {
         &self,
         address: &ManagedAddress
     );
+
+    #[endpoint(withdraw)]
+    fn withdraw(&self);
 }
