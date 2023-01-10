@@ -7,22 +7,27 @@ elrond_wasm::derive_imports!();
 pub trait MaintenanceModule: 
     crate::storage::StorageModule 
     {
-
+        
+        // the endpoint for distributing the protocol fees
+        // protocol rewards are in stEGLD.
+        // this endpoint mints & sends the revenue to the contract owner
         #[endpoint(distributeProtocolRevenue)]
         fn distribute_protocol_revenue(&self) {
-            // the endpoint for distributing the protocol fees
-            // protocol rewards are in stEGLD.
-            // this endpoint mints & sends the revenue to the contract owner
-
-            let exchange_rate = self.exchange_rate().get();
             let st_egld_id = self.staked_egld_id().get();
-            let protocol_revenue = self.protocol_revenue().get();
             let sc_owner = self.blockchain().get_owner_address();
+            let protocol_revenue = self.protocol_revenue().get();
+            
+            let exchange_rate = self.exchange_rate().get();
+            let exchange_rate_multiplier = self.exchange_rate_multiplier().get();
 
-            let amount_to_send = &protocol_revenue * &exchange_rate;
+            let amount_to_send = &protocol_revenue * &exchange_rate / exchange_rate_multiplier;
+            let current_total_supply = self.total_token_supply().get();
 
             self.send().esdt_local_mint(&st_egld_id, 0, &amount_to_send);
             self.send().direct_esdt(&sc_owner, &st_egld_id, 0, &amount_to_send);
+
+            self.total_token_supply()
+                .set(&current_total_supply + &amount_to_send);
 
             self.protocol_revenue().set(BigUint::from(0u64));
         }
@@ -56,15 +61,5 @@ pub trait MaintenanceModule:
             );
 
             self.exchange_rate_update_finished().insert(current_epoch);
-        }
-
-        #[inline]
-        fn calculate_delegation(&self) {
-            // get the array of validators with rewards
-
-            // run algorithm to even out stake without removing any 
-
-
-        }        
-    
+        }      
     }

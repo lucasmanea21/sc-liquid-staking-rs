@@ -421,7 +421,7 @@ pub trait StakeContract:
 
         require!(
             !(epoch_exists && mapping_index == 1),
-            "already got rewards amount this epoch"
+            "already withdrew this epoch"
         );
 
         if !epoch_exists {
@@ -456,6 +456,7 @@ pub trait StakeContract:
     #[only_owner]
     #[endpoint]
     fn push_validators(&self, address: &ManagedAddress) {
+        // todo: if it isn't on the list, add it to stake vector and rewards vector as well
         self.validators().push(address);
     }
 
