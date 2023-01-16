@@ -157,6 +157,10 @@ clearRewardsStarted() {
     erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="clearRewardsStarted" --send --proxy=${PROXY} --chain=${CHAIN_ID}
 }
 
+clearWithdrawStarted() {
+    erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="clearWithdrawStarted" --send --proxy=${PROXY} --chain=${CHAIN_ID}
+}
+
 clearRewardsFinished() {
     erdpy --verbose contract call ${ADDRESS} --recall-nonce --pem=${ALICE} --gas-limit=50000000 --function="clearRewardsFinished" --send --proxy=${PROXY} --chain=${CHAIN_ID}
 }
@@ -214,6 +218,10 @@ getRewardsInfoFinished() {
 
 getStakeInfoFinished() {
     erdpy --verbose contract query ${ADDRESS} --function="getStakeInfoFinished" --proxy=${PROXY}
+}
+
+getWithdrawFinished() {
+    erdpy --verbose contract query ${ADDRESS} --function="getWithdrawFinished" --proxy=${PROXY}
 }
 
 getRewardsAmounts() {

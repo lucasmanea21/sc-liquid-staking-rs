@@ -14,6 +14,7 @@ elrond_wasm_node::wasm_endpoints! {
         clearRewardsStarted
         clearValidatorStakeAmounts
         clearValidators
+        clearWithdrawStarted
         dailyDelegation
         delegate_direct
         distributeProtocolRevenue

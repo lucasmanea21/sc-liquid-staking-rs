@@ -114,7 +114,9 @@ pub trait StakeContract:
             epoch: self.blockchain().get_block_epoch(),
         };
 
-        self.create_and_send_assets(&payment / &exchange_rate * exchange_rate_multiplier, &caller, &attr);
+        self.stake_value().set(&payment / &exchange_rate * &exchange_rate_multiplier);
+
+        self.create_and_send_assets(&(&payment * & exchange_rate_multiplier) / &exchange_rate, &caller, &attr);
     }
 
     #[payable("*")]
@@ -198,6 +200,11 @@ pub trait StakeContract:
         #[call_result] result: ManagedAsyncCallResult<BigUint>,
     ) {
         let old_value = self.stake_amounts().get(&current_epoch);
+        let mapping_index = self.mapping_index().get();
+
+        if (mapping_index == 1) {
+            self.stake_info_finished().insert(current_epoch);
+        }
 
         match result {
             ManagedAsyncCallResult::Ok(value) => {
@@ -239,6 +246,7 @@ pub trait StakeContract:
                     BigUint::from(0u64)
                 );
             }
+
         }
     }
 
@@ -284,6 +292,10 @@ pub trait StakeContract:
     ) {
         let old_value = self.rewards_amounts().get(&current_epoch);
         let mapping_index = self.mapping_index().get();
+
+        if (mapping_index == 1) {
+            self.rewards_info_finished().insert(current_epoch);
+        }
 
         match result {
             ManagedAsyncCallResult::Ok(value) => {
@@ -390,7 +402,7 @@ pub trait StakeContract:
         self.delegate_contract(wanted_address)
             .reDelegateRewards()
             .async_call()
-            .with_callback(StakeContract::callbacks(self).redelegate_callback(current_epoch, mapping_index))
+            .with_callback(StakeContract::callbacks(self).redelegate_callback(current_epoch))
             .call_and_exit();
     }
 
@@ -398,10 +410,10 @@ pub trait StakeContract:
     fn redelegate_callback(
         &self,
         current_epoch: u64,
-        mapping_index: usize,
-        #[call_result] result: ManagedAsyncCallResult<BigUint>,
+        #[call_result] result: ManagedAsyncCallResult<()>,
     ) {
-        // if mapping index is 1, it means it was the last one
+        let mapping_index = self.redelegate_mapping_index().get();
+        
         if &mapping_index == &(1 as usize) {
             self.redelegate_finished().insert(current_epoch);
         }
@@ -426,7 +438,7 @@ pub trait StakeContract:
 
         if !epoch_exists {
             self.withdraw_mapping_index().set(1 as usize);
-            self.withdraw_started().insert(current_epoch);
+            self.withdraw_started().insert(current_epoch.clone());
         };
 
         let wanted_address = self.validators().get(mapping_index);
@@ -436,7 +448,7 @@ pub trait StakeContract:
         self.delegate_contract(wanted_address)
             .withdraw()
             .async_call()
-            .with_callback(StakeContract::callbacks(self).withdraw_callback(current_epoch, mapping_index))
+            .with_callback(StakeContract::callbacks(self).withdraw_callback(current_epoch))
             .call_and_exit();
     }
 
@@ -444,10 +456,12 @@ pub trait StakeContract:
     fn withdraw_callback(
         &self,
         current_epoch: u64,
-        mapping_index: usize,
-        #[call_result] result: ManagedAsyncCallResult<BigUint>,
+        #[call_result] result: ManagedAsyncCallResult<()>,
     ) {
+        let mapping_index = self.withdraw_mapping_index().get();
+
         // if mapping index is 1, it means it was the last one
+
         if &mapping_index == &(1 as usize) {
             self.withdraw_finished().insert(current_epoch);
         }
@@ -460,6 +474,7 @@ pub trait StakeContract:
         self.validators().push(address);
     }
 
+    // todo: rename to delegateAdmin
     #[endpoint(dailyDelegation)]
     fn daily_delegation(&self) {
         let mut smallest = BigUint::from(0u64);
@@ -472,13 +487,9 @@ pub trait StakeContract:
 
         let is_smaller_than_minimum = (delta_stake > 0 && delta_stake < BigInt::from(10_i64.pow(18)));
         
-        if (is_smaller_than_minimum) {
+        if (is_smaller_than_minimum || delta_stake == 0) {
             self.daily_delegation_finished().insert(current_epoch.clone());
         }
-
-        require!(!is_smaller_than_minimum, "delta_stake is too small to delegate");
-        require!(delta_stake != 0, "delta_stake is 0");
-
 
         if delta_stake > 0 {
             // set smallest as 1st entry

@@ -40,10 +40,12 @@ pub trait MaintenanceModule:
 
             require!(!already_updated, "Exchange rate already updated for this epoch");
 
+            // todo: make this only work with amounts
+            // this approach works even if the operations are not completed
             let stake_info_finished = self.stake_info_finished().contains(&current_epoch);
             let rewards_info_finished = self.rewards_info_finished().contains(&current_epoch);
             let withdraw_finished = self.withdraw_finished().contains(&current_epoch);
-            
+
             require!(
                 stake_info_finished && rewards_info_finished && withdraw_finished,
                 "All operations must be finished before updating exchange rate"

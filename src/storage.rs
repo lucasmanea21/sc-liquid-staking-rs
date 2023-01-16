@@ -100,7 +100,7 @@ pub trait StorageModule {
 
     #[view(getStakeValue)]
     #[storage_mapper("stake_value")]
-    fn stake_value(&self) -> SingleValueMapper<BigInt>;
+    fn stake_value(&self) -> SingleValueMapper<BigUint>;
 
     #[view(getRedelegateMappingIndex)]
     #[storage_mapper("redelegate_mapping_index")]
@@ -228,6 +228,13 @@ pub trait StorageModule {
     fn clear_rewards_started(&self) {
         self.rewards_info_started().clear();
     }
+
+    #[only_owner]
+    #[endpoint(clearWithdrawStarted)]
+    fn clear_withdraw_started(&self) {
+        self.withdraw_started().clear();
+    }
+
 
     #[only_owner]
     #[endpoint(clearValidatorStakeAmounts)]

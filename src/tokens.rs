@@ -117,7 +117,7 @@ pub trait TokenModule:
         attributes: &TokenAttributes,
     ) -> EsdtTokenPayment<Self::Api> {
 
-        let mut created_tokens = self
+        let created_tokens = self
             .undelegated_token()
             .nft_create(amount, attributes);
 

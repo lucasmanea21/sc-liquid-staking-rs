@@ -6,7 +6,8 @@ pub trait HelpersModule:
     crate::storage::StorageModule {
 
     // TODO: transform all the increment functions into a single function
-
+    
+    // TODO: transform increment index to increment index staking
     #[inline]
     fn increment_index(&self) {
        
@@ -17,7 +18,6 @@ pub trait HelpersModule:
         
         if &mapping_index >= &(self.validators().len()) {
             self.mapping_index().set(1 as usize);
-            self.stake_info_finished().insert(current_epoch);
         }
     }
 
@@ -30,7 +30,6 @@ pub trait HelpersModule:
         
         if &mapping_index >= &(self.validators().len()) {
             self.rewards_mapping_index().set(1 as usize);
-            self.rewards_info_finished().insert(current_epoch);
         }
     }
 
@@ -43,7 +42,6 @@ pub trait HelpersModule:
         
         if &mapping_index >= &(self.validators().len()) {
             self.withdraw_mapping_index().set(1 as usize);
-            self.withdraw_finished().insert(current_epoch);
         }
     }
 
@@ -56,7 +54,6 @@ pub trait HelpersModule:
         
         if &mapping_index >= &(self.validators().len()) {
             self.redelegate_mapping_index().set(1 as usize);
-            self.redelegate_finished().insert(current_epoch);
         }
     }
 
